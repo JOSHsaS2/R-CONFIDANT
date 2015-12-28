@@ -1,0 +1,10 @@
+prefix=/usr
+libdir=/usr/lib
+includedir=/usr/include/ns3.22
+
+Name: libns3-raodv
+Description: ns-3 module ns3-raodv
+Version: 3.22
+Libs: -L${libdir} -Wl,-Bdynamic -lns3.22-raodv-debug
+Cflags: -I${includedir}
+Requires: libns3.22-internet-debug libns3.22-wifi-debug libns3.22-applications-debug

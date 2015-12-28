@@ -150,8 +150,8 @@ BasicEnergySource::GetEnergyFraction (void)
 void
 BasicEnergySource::UpdateEnergySource (void)
 {
-  NS_LOG_FUNCTION (this);
-  NS_LOG_DEBUG ("BasicEnergySource:Updating remaining energy.");
+  NS_LOG_FUNCTION (this << Simulator::Now ().GetSeconds ());
+  NS_LOG_DEBUG ( Simulator::Now ().GetSeconds ()<<" BasicEnergySource:Updating remaining energy.");
 
   // do not update if simulation has finished
   if (Simulator::IsFinished ())
@@ -223,14 +223,14 @@ BasicEnergySource::HandleEnergyRechargedEvent (void)
 void
 BasicEnergySource::CalculateRemainingEnergy (void)
 {
-  NS_LOG_FUNCTION (this);
+  NS_LOG_FUNCTION (this << Simulator::Now ().GetSeconds ());
   double totalCurrentA = CalculateTotalCurrent ();
   Time duration = Simulator::Now () - m_lastUpdateTime;
   NS_ASSERT (duration.GetSeconds () >= 0);
   // energy = current * voltage * time
   double energyToDecreaseJ = totalCurrentA * m_supplyVoltageV * duration.GetSeconds ();
   m_remainingEnergyJ -= energyToDecreaseJ;
-  NS_LOG_DEBUG ("BasicEnergySource:Remaining energy = " << m_remainingEnergyJ);
+  NS_LOG_DEBUG ( Simulator::Now ().GetSeconds () << " BasicEnergySource:Remaining energy = " << m_remainingEnergyJ);
 }
 
 } // namespace ns3

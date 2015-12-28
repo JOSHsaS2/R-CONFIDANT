@@ -24,7 +24,6 @@ int
 main (int argc, char *argv[])
 {
   NS_LOG_UNCOND ("Scratch Simulator");
-
   Simulator::Run ();
   Simulator::Destroy ();
 }

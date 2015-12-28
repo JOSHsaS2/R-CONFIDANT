@@ -15,10 +15,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Based on 
+ * Based on
  *      NS-2 AODV model developed by the CMU/MONARCH group and optimized and
  *      tuned by Samir Das and Mahesh Marina, University of Cincinnati;
- * 
+ *
  *      AODV-UU implementation by Erik Nordström of Uppsala University
  *      http://core.it.uu.se/core/index.php/AODV-UU
  *
@@ -81,6 +81,8 @@ TypeHeader::Deserialize (Buffer::Iterator start)
     case AODVTYPE_RREP:
     case AODVTYPE_RERR:
     case AODVTYPE_RREP_ACK:
+    case AODVTYPE_PRATING:
+    case AODVTYPE_ALARM:
       {
         m_type = (MessageType) type;
         break;
@@ -118,6 +120,16 @@ TypeHeader::Print (std::ostream &os) const
         os << "RREP_ACK";
         break;
       }
+    case AODVTYPE_PRATING:
+        {
+            os << "PRATING";
+            break;
+        }
+    case AODVTYPE_ALARM:
+        {
+            os << "ALARM";
+            break;
+        }
     default:
       os << "UNKNOWN_TYPE";
     }
@@ -428,7 +440,7 @@ RrepAckHeader::RrepAckHeader () :
 }
 
 NS_OBJECT_ENSURE_REGISTERED (RrepAckHeader);
-  
+
 TypeId
 RrepAckHeader::GetTypeId ()
 {

@@ -95,10 +95,15 @@ GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, Ptr<Node> n,
 
 /// Trace function for remaining energy at node.
 void
-RemainingEnergy (double oldValue, double remainingEnergy)
+RemainingEnergy ( double oldValue, double remainingEnergy)
 {
-  NS_LOG_UNCOND (Simulator::Now ().GetSeconds ()
-                 << "s Current remaining energy = " << remainingEnergy << "J");
+  NS_LOG_UNCOND("RemainingEnergy(): "<<oldValue <<","<< remainingEnergy);
+	NS_LOG_UNCOND (Simulator::Now ().GetSeconds ()
+                  <<"s Current remaining energy = " << remainingEnergy << "J");
+  /*NS_LOG_UNCOND ((Simulator::Now ()).GetMicroSeconds()
+                    <<"s Current remaining energy = " << remainingEnergy << "J");
+  NS_LOG_UNCOND ((Simulator::Now ()).GetMicroSeconds()/1000000 <<"."<<(Simulator::Now ()).GetMicroSeconds()%1000000
+                   <<"s Current remaining energy = " << remainingEnergy << "J");*/
 }
 
 /// Trace function for total energy consumption at node.
@@ -118,7 +123,7 @@ main (int argc, char *argv[])
   LogComponentEnable ("DeviceEnergyModel", LOG_LEVEL_DEBUG);
   LogComponentEnable ("WifiRadioEnergyModel", LOG_LEVEL_DEBUG);
    */
-
+  //Config::SetDefault ("ns3::BasicEnergySource::PeriodicEnergyUpdateInterval", TimeValue(Seconds(20.0)));
   std::string phyMode ("DsssRate1Mbps");
   double Prss = -80;            // dBm
   uint32_t PpacketSize = 200;   // bytes
@@ -214,7 +219,8 @@ main (int argc, char *argv[])
   /* energy source */
   BasicEnergySourceHelper basicSourceHelper;
   // configure energy source
-  basicSourceHelper.Set ("BasicEnergySourceInitialEnergyJ", DoubleValue (0.1));
+  basicSourceHelper.Set ("BasicEnergySourceInitialEnergyJ", DoubleValue (10));
+  basicSourceHelper.Set ("PeriodicEnergyUpdateInterval", TimeValue(Seconds(3.0)));
   // install source
   EnergySourceContainer sources = basicSourceHelper.Install (c);
   /* device energy model */
@@ -253,9 +259,9 @@ main (int argc, char *argv[])
   basicSourcePtr->TraceConnectWithoutContext ("RemainingEnergy", MakeCallback (&RemainingEnergy));
   // device energy model
   Ptr<DeviceEnergyModel> basicRadioModelPtr =
-    basicSourcePtr->FindDeviceEnergyModels ("ns3::WifiRadioEnergyModel").Get (0);
+   basicSourcePtr->FindDeviceEnergyModels ("ns3::WifiRadioEnergyModel").Get (0);
   NS_ASSERT (basicRadioModelPtr != NULL);
-  basicRadioModelPtr->TraceConnectWithoutContext ("TotalEnergyConsumption", MakeCallback (&TotalEnergy));
+ //basicRadioModelPtr->TraceConnectWithoutContext ("TotalEnergyConsumption", MakeCallback (&TotalEnergy));
   /***************************************************************************/
 
 
@@ -264,7 +270,7 @@ main (int argc, char *argv[])
   Simulator::Schedule (Seconds (startTime), &GenerateTraffic, source, PpacketSize,
                        networkNodes.Get (0), numPackets, interPacketInterval);
 
-  Simulator::Stop (Seconds (10.0));
+  Simulator::Stop (Seconds (90.0));
   Simulator::Run ();
   Simulator::Destroy ();
 

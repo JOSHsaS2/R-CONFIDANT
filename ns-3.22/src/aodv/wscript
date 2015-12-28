@@ -11,6 +11,13 @@ def build(bld):
         'model/aodv-packet.cc',
         'model/aodv-neighbor.cc',
         'model/aodv-routing-protocol.cc',
+        'model/confidant.cpp',
+        'model/Confidant-packet.cpp',
+        'model/Detector.cpp',
+        'model/Monitor.cpp',
+        'model/PathManager.cpp',
+        'model/ReputationSystem.cpp',
+        'model/TrustManager.cpp',
         'helper/aodv-helper.cc',
         ]
 
@@ -33,6 +40,13 @@ def build(bld):
         'model/aodv-packet.h',
         'model/aodv-neighbor.h',
         'model/aodv-routing-protocol.h',
+        'model/confidant.h',
+        'model/Confidant-packet.h',
+        'model/Detector.h',
+        'model/Monitor.h',
+        'model/PathManager.h',
+        'model/ReputationSystem.h',
+        'model/TrustManager.h',
         'helper/aodv-helper.h',
         ]
 

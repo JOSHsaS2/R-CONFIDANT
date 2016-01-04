@@ -258,14 +258,14 @@ void ReputationSystem::checkClassification(Ipv4Address target_ip) {
 	}
 }
 
-void ReputationSystem::handleReputationFading(Ipv4Address ip, F_Rating* f,
+bool ReputationSystem::handleReputationFading(Ipv4Address ip, F_Rating* f,
 		Repu_Rating* r) {
 	NS_LOG_FUNCTION(this << getNodeId() << ip << r->getAlpha() << r->getBeta());
 	if ((r->getAlpha() < FADING_T) && (r->getBeta() < FADING_T)) {
 		if (!isMalicious(ip)) {
 			if (ifenableL && !L_TRADEOFF) {
 				rmFirsthandItem(ip);
-				return;
+				return false;
 			}
 			if (ifenableL && L_TRADEOFF) {
 				if (!(m_neighbour->IsNeighbor(ip))) {
@@ -273,13 +273,17 @@ void ReputationSystem::handleReputationFading(Ipv4Address ip, F_Rating* f,
 						rmReputationItem(ip);
 				}
 				rmFirsthandItem(ip);
+				return false;
 			}
 		} else {
 			path_m->rmMnode(ip);
-			if (ifenableL)
+			if (ifenableL){
 				rmFirsthandItem(ip);
+			    return false;
+			}
 		}
 	}
+	return true;
 }
 
 void ReputationSystem::exchangeFirsthandInfo(/*RatingTable& ratings*/) //duplicated packets check
@@ -759,7 +763,7 @@ int ReputationSystem::compPriority(Ipv4Address pre, Ipv4Address newEntry) {
 void ReputationSystem::setPublicTimer() {
 	///public_t(Timer::CANCEL_ON_DESTROY);
 	public_t.SetFunction(&ReputationSystem::handlePublicExpire, this);
-	public_t.Schedule(Seconds(m_uniformRandomVariable->GetValue(22.0, 24.0)));
+	public_t.Schedule(Seconds(m_uniformRandomVariable->GetValue(52.0, 54.0)));
 	//NS_LOG_DEBUG("Set public timer for share first-hand information");
 }
 

@@ -137,6 +137,7 @@ RoutingProtocol::RoutingProtocol() :
 //repuSys(),
 //c_monitor(repuSys, m_nb, PACK_TIMEOUT, m_ipv4)
 {
+	IsMalicious = false;
 	m_nb.SetCallback(
 			MakeCallback(&RoutingProtocol::SendRerrWhenBreaksLinkToNextHop,
 					this));
@@ -159,7 +160,8 @@ RoutingProtocol::RoutingProtocol() :
 	repuSys->setCallbackSendRerrWhenNoRouteToForward(
 			MakeCallback(&RoutingProtocol::SendRerrWhenNoRouteToForward, this));
 	isNeighbor = false;
-	repuSys->setcallbackNeighborFlag(MakeCallback(&RoutingProtocol::setIsNeighborFlag, this));
+	repuSys->setcallbackNeighborFlag(
+			MakeCallback(&RoutingProtocol::setIsNeighborFlag, this));
 	repuSys->setCallbackLUT(
 			MakeCallback(&ns3::confidant::Monitor::findItemLUT, c_monitor));
 	repuSys->setcallbackSendRequest(
@@ -522,7 +524,8 @@ bool RoutingProtocol::Forwarding(Ptr<const Packet> p, const Ipv4Header & header,
 	if (IsMalicious) {
 		//When malicious node receives packet it drops the packet.
 		NS_LOG_APPEND_CONTEXT
-		NS_LOG_UNCOND(" Launching SELFISH Attack! Packet dropped: " << p->GetUid());
+		NS_LOG_UNCOND(
+				" Launching SELFISH Attack! Packet dropped: " << p->GetUid());
 		return false;
 	}
 	/* Code for Blackhole attack simulation ends here */
@@ -579,7 +582,8 @@ bool RoutingProtocol::Forwarding(Ptr<const Packet> p, const Ipv4Header & header,
 							NS_LOG_UNCOND(
 									"Register a forwarded packet in RouteInput()");
 							mac_id = entry->GetMacAddress();
-							NS_LOG_UNCOND(mac_id <<" "<< toDst.GetNextHop()<<" " << dst);
+							NS_LOG_UNCOND(
+									mac_id <<" "<< toDst.GetNextHop()<<" " << dst);
 							c_monitor->registerPack(p, mac_id, dst,
 									toDst.GetNextHop());
 						}
@@ -1138,7 +1142,7 @@ void RoutingProtocol::RecvRequest(Ptr<Packet> p, Ipv4Address receiver,
 	Ipv4Address origin = rreqHeader.GetOrigin();
 
 	// CONFIDANT: only both of the originator and pre hop are regular, then pass
-	if (ifEnableC && (!pathM->isNodeSafe(origin) || !pathM->isNodeSafe(src))){
+	if (ifEnableC && !(pathM->isNodeSafe(origin) && pathM->isNodeSafe(src))) {
 		NS_LOG_APPEND_CONTEXT
 		NS_LOG_UNCOND("Ignore RREQ, origin: "<< origin << "src: " << src);
 		return;
@@ -1249,7 +1253,7 @@ void RoutingProtocol::RecvRequest(Ptr<Packet> p, Ipv4Address receiver,
 	Ipv4Address dst = rreqHeader.GetDst();
 	if (/*IsMalicious || */m_routingTable.LookupRoute(dst, toDst)) {
 		/*
-		 * Drop RREQ, This node RREP wil make a loop.
+		 * Drop RREQ, This node RREP will make a loop.
 		 */
 		if (toDst.GetNextHop() == src) {
 			NS_LOG_DEBUG(
@@ -1271,11 +1275,13 @@ void RoutingProtocol::RecvRequest(Ptr<Packet> p, Ipv4Address receiver,
 				m_routingTable.LookupRoute(origin, toOrigin);
 
 				// CONFIDANT: if the next_hop become selfish, drop the reply.
-				if (ifEnableC && !pathM->isNodeSafe(toOrigin.GetNextHop())) {
+				if (ifEnableC && !(pathM->isNodeSafe(toOrigin.GetNextHop()))) {
 					NS_LOG_APPEND_CONTEXT
-					NS_LOG_UNCOND("Drop RREP due to selfish next hop, "<< toOrigin.GetNextHop());
+					NS_LOG_UNCOND(
+							"Drop RREP due to selfish next hop, "<< toOrigin.GetNextHop());
 					//detele rreq record in dulplicate idcache to allow following identical rreqs.
-					NS_LOG_UNCOND("Delete RREQ record, "<< rreqHeader.GetId() <<", for later ones "<< toOrigin.GetNextHop());
+					NS_LOG_UNCOND(
+							"Delete RREQ record, "<< rreqHeader.GetId() <<", for later ones "<< toOrigin.GetNextHop());
 					m_rreqIdCache.DeleteRreqRecord(toOrigin.GetNextHop(),
 							rreqHeader.GetId());
 					return;
@@ -1309,7 +1315,7 @@ void RoutingProtocol::RecvRequest(Ptr<Packet> p, Ipv4Address receiver,
 	}
 
 	// CONFIDANT: check whether origin is selfish before forward broadcast RREQ
-	if (ifEnableC && !pathM->isNodeSafe(origin)){
+	if (ifEnableC && !(pathM->isNodeSafe(origin))) {
 		NS_LOG_APPEND_CONTEXT
 		NS_LOG_UNCOND("Do not forward RREQ due to selfish origin, "<<origin);
 		return;
@@ -1350,11 +1356,13 @@ void RoutingProtocol::SendReply(RreqHeader const & rreqHeader,
 		m_seqNo++;
 
 	// CONFIDANT: if the next_hop become selfish, drop the reply.
-	if (ifEnableC && !pathM->isNodeSafe(toOrigin.GetNextHop())) {
+	if (ifEnableC && !(pathM->isNodeSafe(toOrigin.GetNextHop()))) {
 		NS_LOG_APPEND_CONTEXT
-		NS_LOG_UNCOND("Drop RREP due to selfish next hop, "<< toOrigin.GetNextHop());
+		NS_LOG_UNCOND(
+				"Drop RREP due to selfish next hop, "<< toOrigin.GetNextHop());
 		//detele rreq record in dulplicate idcache to allow following identical rreqs.
-		NS_LOG_UNCOND("Delete RREQ record, "<< rreqHeader.GetId() <<", for later ones "<< toOrigin.GetNextHop());
+		NS_LOG_UNCOND(
+				"Delete RREQ record, "<< rreqHeader.GetId() <<", for later ones "<< toOrigin.GetNextHop());
 		m_rreqIdCache.DeleteRreqRecord(toOrigin.GetNextHop(),
 				rreqHeader.GetId());
 		return;
@@ -1463,9 +1471,10 @@ void RoutingProtocol::RecvReply(Ptr<Packet> p, Ipv4Address receiver,
 	Ipv4Address dst = rrepHeader.GetDst();
 	NS_LOG_LOGIC(
 			"RREP destination " << dst << " RREP origin " << rrepHeader.GetOrigin ());
-	if (ifEnableC && !(pathM->isNodeSafe(sender)) && (sender != dst)){
+	if (ifEnableC && !(pathM->isNodeSafe(sender)) && (sender != dst)) {
 		NS_LOG_APPEND_CONTEXT
-		NS_LOG_UNCOND("Ignore RREP due to the selfish sender, "<< sender <<" ,which is not direct destination");
+		NS_LOG_UNCOND(
+				"Ignore RREP due to the selfish sender, "<< sender <<" ,which is not direct destination");
 		return;
 	}
 
@@ -1528,7 +1537,7 @@ void RoutingProtocol::RecvReply(Ptr<Packet> p, Ipv4Address receiver,
 							rrepHeader, toDst, newEntry, sender);
 				}
 			}
-			/* CONFIDANT - the name of object of reputaation system is repuSys*/
+			/* CONFIDANT - the name of object of reputation system is repuSys*/
 		}
 	} else {
 		// The forward route for this destination is created if it does not already exist.
@@ -1560,10 +1569,12 @@ void RoutingProtocol::RecvReply(Ptr<Packet> p, Ipv4Address receiver,
 	}
 
 	/*if next hop is selfish, do not forward this RREP*/
-	if (ifEnableC && !(pathM->isNodeSafe(toOrigin.GetNextHop())))
+	if (ifEnableC && !(pathM->isNodeSafe(toOrigin.GetNextHop()))) {
 		NS_LOG_APPEND_CONTEXT
-		NS_LOG_UNCOND("Do not forward RREP due to selfish next hop, "<< toOrigin.GetNextHop());
+		NS_LOG_UNCOND(
+				"Do not forward RREP due to selfish next hop, "<< toOrigin.GetNextHop());
 		return;
+	}
 
 	toOrigin.SetLifeTime(std::max(ActiveRouteTimeout, toOrigin.GetLifeTime()));
 	m_routingTable.Update(toOrigin);
@@ -1807,7 +1818,8 @@ void RoutingProtocol::SendPacketFromQueue(Ipv4Address dst,
 
 		if (ifEnableL && p->RemovePacketTag(alarm_tag)) {
 			NS_LOG_APPEND_CONTEXT
-			NS_LOG_UNCOND ("deal alarm from RREQ queue, packet: "<< p->GetUid() << "dst: "<< dst << "route: "<<route);
+			NS_LOG_UNCOND(
+					"deal alarm from RREQ queue, packet: "<< p->GetUid() << "dst: "<< dst << "route: "<<route);
 			RoutingTableEntry rt;
 			bool ifroute = m_routingTable.LookupValidRoute(dst, rt);
 			if (ifroute) {
@@ -1853,7 +1865,8 @@ void RoutingProtocol::SendPacketFromQueue(Ipv4Address dst,
 						NS_LOG_UNCOND(
 								"Register a forwarded packet from PacketQueue");
 						mac_id = entry->GetMacAddress();
-						NS_LOG_UNCOND(mac_id <<" "<< route->GetGateway()<<" " << dst);
+						NS_LOG_UNCOND(
+								mac_id <<" "<< route->GetGateway()<<" " << dst);
 						c_monitor->registerPack(p, mac_id, dst,
 								route->GetGateway());
 					}
@@ -1905,17 +1918,17 @@ void RoutingProtocol::SendRerrWhenBreaksLinkToNextHop(Ipv4Address nextHop) {
 	//CONFIDANT: code to invoke sendAlarm and delete first-hand and reputation items
 	//the name of object of monitor is c_monitor
 	//the name of switch of L-confidant is ifEnableL--bool
-	if(isNeighbor){
+	if (isNeighbor) {
 		isNeighbor = false;
 		return;
 	}
 	if (ifEnableL) {
 		c_monitor->deleteItemFromLUT(nextHop); // delete item in last update table
-		if (repuSys->isMalicious(nextHop)){
-			NS_LOG_UNCOND("send alarm when next hop with breaking linking is selfish "<< nextHop);
+		if (repuSys->isMalicious(nextHop)) {
+			NS_LOG_UNCOND(
+					"send alarm when next hop with breaking linking is selfish "<< nextHop);
 			repuSys->SendAlarm(nextHop, m_routingTable, m_queue, AODV_PORT);
-		}
-		else {
+		} else {
 			if (!repuSys->getTradeoffSwitch()) {
 				//add refined code to keep items for a while before deleting them
 				repuSys->rmFirsthandItem(nextHop);

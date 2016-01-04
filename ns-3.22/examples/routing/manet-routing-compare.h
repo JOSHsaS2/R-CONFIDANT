@@ -141,8 +141,8 @@ RoutingExperiment::RoutingExperiment ()
     uofa_simu_areaSizeY ("1000.0"),
 
     uofa_simu_totalSimulationTime (1200.0),
-    uofa_simu_nodeStartupTime_Min (20.0),
-    uofa_simu_nodeStartupTime_Max (30.0),
+    uofa_simu_nodeStartupTime_Min (50.0),
+    uofa_simu_nodeStartupTime_Max (51.0),
     nodePauseTime (0),
     enableC (false),
     enableL (false),

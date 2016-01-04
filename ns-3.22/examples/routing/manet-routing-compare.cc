@@ -194,75 +194,6 @@ Ptr<Socket> RoutingExperiment::SetupPacketReceive(Ipv4Address addr,
 	return sink;
 }
 
-std::string RoutingExperiment::CommandSetup(int argc, char **argv) {
-	CommandLine cmd;
-	cmd.AddValue("CSVfileName", "The name of the CSV output file name",
-			m_CSVfileName);
-	cmd.AddValue("pcap", "Write PCAP traces.", pcap);
-	cmd.AddValue("traceMobility", "Enable m obility tracing", m_traceMobility);
-
-	// AODV-CONFIDANT VARIED PARAMETERS
-	cmd.AddValue("totalNodes", "Total Nodes",
-			uofa_totalNumberOfNodes);
-	cmd.AddValue("sinks",
-			"Total Number of Sinks. Notes: must less than half of total number of nodes",
-			uofa_numberOfSinks);
-	cmd.AddValue("malicious", "Number of Malicious Nodes",
-			uofa_numberOfMaliciousNodes);
-	cmd.AddValue("power", "Node Transmission Power",
-			uofa_simu_transmissionPower);
-	cmd.AddValue("protocol", "0=AODV; 1=CONFIDANT; 2=L-CONFIDANT; 3=TradeOff",
-			m_protocol);
-	cmd.AddValue("pauseTime", "range: from 0 to 900 s", nodePauseTime);
-
-	cmd.AddValue("mvtSpeedMax", "Max Node Movement Speed",
-			uofa_nodeMovementSpeedMax);
-	cmd.AddValue("mvtSpeedMin", "Min Node Movement Speed",
-			uofa_nodeMovementSpeedMin);
-	cmd.AddValue("sizeX", "Simulation Area X-size", uofa_simu_areaSizeX);
-	cmd.AddValue("sizeY", "Simulation Area Y-size", uofa_simu_areaSizeY);
-	cmd.AddValue("totalTime", "Total Simulation Time",
-			uofa_simu_totalSimulationTime);
-	cmd.AddValue("startupMin", "Node Startup Min Time",
-			uofa_simu_nodeStartupTime_Min);
-	cmd.AddValue("startupMax", "Node Startup Max Time",
-			uofa_simu_nodeStartupTime_Max);
-
-	cmd.Parse(argc, argv);
-
-	dictory_name = "_T" + NumberToString(uofa_totalNumberOfNodes) + "_M"
-			+ NumberToString(uofa_numberOfMaliciousNodes) + "_PT"
-			+ NumberToString(nodePauseTime) + "_S"
-			+ NumberToString(uofa_numberOfSinks) + "_";
-
-	return m_CSVfileName;
-}
-
-int main(int argc, char *argv[]) {
-	RoutingExperiment experiment;
-
-	//CONFIDANT: invoke command setup method
-	std::string CSVfileName = experiment.CommandSetup(argc, argv);
-	//experiment.initialize_files();
-
-	//blank out the last output file and write the column headers
-	/*
-	 std::ofstream out (CSVfileName.c_str ());
-	 out << "SimulationSecond," <<
-	 "ReceiveRate," <<
-	 "PacketsReceived," <<
-	 "NumberOfSinks," <<
-	 "RoutingProtocol," <<
-	 "TransmissionPower" <<
-	 std::endl;
-	 out.close ();
-	 */
-	int nSinks = experiment.uofa_numberOfSinks;
-	double txp = experiment.uofa_simu_transmissionPower;
-
-	experiment.Run(nSinks, txp, CSVfileName);
-}
-
 void RoutingExperiment::setAllContainer(NodeContainer* nc,
 		NetDeviceContainer* ndc, Ipv4InterfaceContainer* ipic) {
 	this->nc = nc;
@@ -308,6 +239,76 @@ void RoutingExperiment::initialize_files() {
 	out_Trust << "NodeId," << "Time," << "Size" << std::endl;
 	out_Trust.close();
 }
+
+std::string RoutingExperiment::CommandSetup(int argc, char **argv) {
+	CommandLine cmd;
+	cmd.AddValue("CSVfileName", "The name of the CSV output file name",
+			m_CSVfileName);
+	cmd.AddValue("pcap", "Write PCAP traces.", pcap);
+	cmd.AddValue("traceMobility", "Enable m obility tracing", m_traceMobility);
+
+	// AODV-CONFIDANT VARIED PARAMETERS
+	cmd.AddValue("totalNodes", "Total Nodes",
+			uofa_totalNumberOfNodes);
+	cmd.AddValue("sinks",
+			"Total Number of Sinks. Notes: must less than half of total number of nodes",
+			uofa_numberOfSinks);
+	cmd.AddValue("malicious", "Number of Malicious Nodes",
+			uofa_numberOfMaliciousNodes);
+	cmd.AddValue("power", "Node Transmission Power",
+			uofa_simu_transmissionPower);
+	cmd.AddValue("protocol", "0=AODV; 1=CONFIDANT; 2=L-CONFIDANT; 3=TradeOff",
+			m_protocol);
+	cmd.AddValue("pauseTime", "range: from 0 to 900 s", nodePauseTime);
+
+	cmd.AddValue("mvtSpeedMax", "Max Node Movement Speed",
+			uofa_nodeMovementSpeedMax);
+	cmd.AddValue("mvtSpeedMin", "Min Node Movement Speed",
+			uofa_nodeMovementSpeedMin);
+	cmd.AddValue("sizeX", "Simulation Area X-size", uofa_simu_areaSizeX);
+	cmd.AddValue("sizeY", "Simulation Area Y-size", uofa_simu_areaSizeY);
+	cmd.AddValue("totalTime", "Total Simulation Time",
+			uofa_simu_totalSimulationTime);
+	cmd.AddValue("startupMin", "Node Startup Min Time",
+			uofa_simu_nodeStartupTime_Min);
+	cmd.AddValue("startupMax", "Node Startup Max Time",
+			uofa_simu_nodeStartupTime_Max);
+
+	cmd.Parse(argc, argv);
+
+	dictory_name = "T" + NumberToString(uofa_totalNumberOfNodes) + "_M"
+			+ NumberToString(uofa_numberOfMaliciousNodes) + "_PT"
+			+ NumberToString(nodePauseTime) + "_S"
+			+ NumberToString(uofa_numberOfSinks) + "_";
+
+	return m_CSVfileName;
+}
+
+int main(int argc, char *argv[]) {
+	RoutingExperiment experiment;
+
+	//CONFIDANT: invoke command setup method
+	std::string CSVfileName = experiment.CommandSetup(argc, argv);
+	//experiment.initialize_files();
+
+	//blank out the last output file and write the column headers
+	/*
+	 std::ofstream out (CSVfileName.c_str ());
+	 out << "SimulationSecond," <<
+	 "ReceiveRate," <<
+	 "PacketsReceived," <<
+	 "NumberOfSinks," <<
+	 "RoutingProtocol," <<
+	 "TransmissionPower" <<
+	 std::endl;
+	 out.close ();
+	 */
+	int nSinks = experiment.uofa_numberOfSinks;
+	double txp = experiment.uofa_simu_transmissionPower;
+
+	experiment.Run(nSinks, txp, CSVfileName);
+}
+
 
 void RoutingExperiment::Run(int nSinks, double txp, std::string CSVfileName) {
 	Packet::EnablePrinting();
@@ -546,7 +547,7 @@ void RoutingExperiment::Run(int nSinks, double txp, std::string CSVfileName) {
 	onoff1.SetAttribute("OnTime",
 			StringValue("ns3::ConstantRandomVariable[Constant=1.0]"));
 	onoff1.SetAttribute("OffTime",
-			StringValue("ns3::ConstantRandomVariable[Constant=0.0]"));
+			StringValue("ns3::ConstantRandomVariable[Constant=1.0]"));
 
 	for (int i = 0; i < nSinks; i++) {
 		//Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
@@ -655,7 +656,7 @@ void RoutingExperiment::Run(int nSinks, double txp, std::string CSVfileName) {
 
 	Simulator::Stop(Seconds(TotalTime));
 
-	AnimationInterface anim("manet-routing-compare.xml"); // FOR GENERATING NETANIM XML FILE
+	//AnimationInterface anim("manet-routing-compare.xml"); // FOR GENERATING NETANIM XML FILE
 
 	Simulator::Run();
 

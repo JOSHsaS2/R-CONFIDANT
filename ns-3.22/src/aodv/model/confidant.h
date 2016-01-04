@@ -155,7 +155,7 @@ class F_Rating : public Rating
 private:
     Timer f_timer;
     Repu_Rating* repu;
-    Callback<void, Ipv4Address, F_Rating*, Repu_Rating*> classifyNode;
+    Callback<bool, Ipv4Address, F_Rating*, Repu_Rating*> classifyNode;
 public:
     F_Rating(double fading_f, Ipv4Address f_ip);
 
@@ -166,7 +166,7 @@ public:
     void reScheduleTimer();
     void updateByOb(BEHAVIOR behavior);
     void handleFadingTimeoutExpire(Ipv4Address f_ip);
-    void setClassifyCallback(Callback<void, Ipv4Address, F_Rating*, Repu_Rating*> cb);
+    void setClassifyCallback(Callback<bool, Ipv4Address, F_Rating*, Repu_Rating*> cb);
 };
 
 

@@ -148,7 +148,7 @@ public:
     bool getTradeoffSwitch();
 
     void setCallbackLUT(Callback<bool, Ipv4Address> cb);
-    void handleReputationFading(Ipv4Address, F_Rating*, Repu_Rating*);
+    bool handleReputationFading(Ipv4Address, F_Rating*, Repu_Rating*);
     /* modified CONFIDANT methods -- end*/
 
     /*

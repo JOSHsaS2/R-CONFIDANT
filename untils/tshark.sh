@@ -8,6 +8,11 @@ preindex=$1
 #node size
 count=$2
 
+#.csv files name for drop rate & overhead
+f_drop="drop_rate.csv"
+f_overhead="overhead.csv"
+prefix=$3
+
 i=0
 packetcount=0
 received=0
@@ -30,7 +35,7 @@ while [ $i -lt $count ]; do
      result=$(tshark -r $preindex-$i-0.pcap -Y "$filter" | wc -l)
      r=$(tshark -r $preindex-$i-0.pcap -Y "$filter3" | wc -l)
      r_sent=$(tshark -r $preindex-$i-0.pcap -Y "$filter2" | wc -l)
-     echo "received: $r, sent: $r_sent"
+     #echo "received: $r, sent: $r_sent"
      packetcount=`expr $packetcount + $result`
      received=`expr $received + $r`
      sent=`expr $sent + $r_sent`
@@ -39,6 +44,8 @@ done
 echo "total received: $received, total sent: $sent"
 droprate=$(echo "scale=5; ($sent - $received) / $sent" |bc)
 echo "droptate: $droprate; overload: $packetcount"
+printf "$droprate\n" >> $prefix$f_drop
+printf "$packetcount\n" >> $prefix$f_overhead
 
 
 

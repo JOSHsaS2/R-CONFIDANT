@@ -37,7 +37,7 @@ while [ $i -lt $count ]; do
      i=`expr $i + 1`
 done
 echo "total received: $received, total sent: $sent"
-droprate=$(echo "scale=5; $received / $sent" |bc)
+droprate=$(echo "scale=5; ($sent - $received) / $sent" |bc)
 echo "droptate: $droprate; overload: $packetcount"
 
 

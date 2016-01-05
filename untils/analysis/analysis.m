@@ -7,18 +7,20 @@ t = max_time / interval;
 id = csv_m(:,1);
 time = csv_m(:,2);
 number = csv_m(:,3);
+
+tmp_number = zeros(1,node_n);
 for s = 1:interval
-    tmp = 0;
-    tmp_number = zeros(1,node_n);
+    tmp = 0; 
     for j = 1:node_n
-        c_time = time(((s-1)*t < time <= s * t) & (id == j-1));
-        if(size(c_time) == 0)
+        c_time = time((time > (s-1)*t)& (time <= s * t) & (id == j-1));
+        [r, c] = size(c_time); 
+        if(r == 0)
             tmp = tmp + tmp_number(j);
         else
-        c_number = number(((s-1)*t < time <= s * t) & (id == j-1));
+        c_number = number((time > (s-1)*t) &(time <= s * t) & (id == j-1));
         [v, index] = max(c_time);
         tmp = tmp + c_number(index);
-        tmp_number = c_number(index);
+        tmp_number(j) = c_number(index);
         end
     end
     result(1+s) = tmp;

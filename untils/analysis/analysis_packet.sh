@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ## USAGE: ./analysis_packet.sh node_size /path/to/generated/csv/files/directory/csv_prefix_name /path/to/Pcap/files/directory/prefix_name_aodv_without_selfish_nodes /path/to/Pcap/files/directory/prefix_name_aodv /path/to/Pcap/files/directory/prefix_name_confidant /path/to/Pcap/files/directory/prefix_name_l-confidant /path/to/Pcap/files/directory/prefix_name_tradeoff
 #place tshark.sh in the same directory

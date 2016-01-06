@@ -1,6 +1,17 @@
 function [ result ] = Analysis( csv_m, size_item, max_time, interval, node_n )
-%Analysis Summary of this function goes here
-%   Detailed explanation goes here
+% function 'Analysis' is used to generate vectors for plotting results 
+% related to Memory Usage and Remaining Power of different protocols 
+
+%   csv_m: the data matrix read from a .csv file.
+%   size_item: unit memory usage each item in table; for Remaing Power, 
+%   set it as 1.
+%   max_time: total running time of one simulation.
+%   interval: number of time interval displayed in figures plotted 
+%   (default: 5).
+%   node_n: total number of nodes in one simulation.
+
+%   result: 1xX vertor, each element indicates the memory or power usage
+%   for corresponding time interval.
 
 result = zeros(1, interval+1);
 t = max_time / interval;

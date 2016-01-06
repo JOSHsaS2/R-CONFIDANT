@@ -1,3 +1,27 @@
+%This script is used to plot memory usage of 3 different CONFIDANT
+%versions into one figure. Parts of properties are determined by
+%user-defined inpput.
+
+%Generally, the format of names of trace files produced by simulation as
+%follows:
+%          AODV_xxx_Txxx_Mxxx_PTxxx_Sxxx_[-x-0.pcap|x.csv]
+
+%AODV_xxx: 'xxx' indicates the name of CONFIDANT with different versions,
+%i.e.(CONFIDANT, L-CONFIDANT,L-CONFIDANT-TradeOff). when the 'xxx' is null,
+%it means nodes are equipped with AODV only.
+
+%[T|M|PT|S]xxx: T->total number of nodes; M->number of selfish nodes
+%               PT->pause time; S->number of sinks.
+%'xxx' indicates the actual values for these properties.
+
+%[-x-0.pcap]: 'x' means the id of the node in simulation.
+%[x.csv]; 'x' means the name of .csv files.
+
+% Note: the variable 's_params' in the script is expected as a string with
+% the format as 'Txxx_Mxxx_PTxxx_Sxxx_'. Also, for '[c|l|trade]_prefix',
+% the input should be '/path/to/file/directory/AODV_xxx_'.
+
+
 prompt = 'CONFIDANT: input prefix name of *.csv files\n';
 c_prefix = input(prompt, 's');
 prompt = 'L-CONFIDANT: input prefix name of *.csv files\n';

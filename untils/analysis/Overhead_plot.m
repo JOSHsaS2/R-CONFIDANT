@@ -1,3 +1,7 @@
+% This script aims to plot a bar chart about overhead consumption of simulation which
+% nodes are equipped with defferent protocols: 
+% AODV without selfish nodes, AODV, CONFIDANT, L-CONFIDANT, L-CONFIDANT-TRADEOFF. 
+
 prompt = 'Overhead: input prefix name of *.csv files\n';
 c_prefix = input(prompt, 's');
 s_params = input('parameters: ', 's');

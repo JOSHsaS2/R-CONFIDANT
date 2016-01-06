@@ -1,3 +1,9 @@
+% This script is used to plot the average selfish nodes detection time for
+% nodes with 3 different CONFIDANT protocols in one figure.
+
+% Note: The format and repuirment of inputs can be found in script
+% 'memory_analysi.m'.
+
 prompt = 'CONFIDANT: input prefix name of *.csv files\n';
 c_prefix = input(prompt, 's');
 prompt = 'L-CONFIDANT: input prefix name of *.csv files\n';

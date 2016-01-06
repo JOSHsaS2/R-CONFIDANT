@@ -1,3 +1,8 @@
+% This script is used to plot the average power usage of all nodes in the 
+%simulation with different versions of CONFIDANT protocol.
+% The explation and requirments of imput can be found in script
+% 'memory_analysis.m'.
+
 prompt = 'CONFIDANT: input prefix name of *.csv files\n';
 c_prefix = input(prompt, 's');
 prompt = 'L-CONFIDANT: input prefix name of *.csv files\n';

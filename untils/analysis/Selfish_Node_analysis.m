@@ -1,6 +1,18 @@
 function [ result ] = Selfish_Node_analysis( m_record, m_detection, max_time, interval, selfish_size, node_size )
-%UNTITLED2 Summary of this function goes here
-%   Detailed explanation goes here
+%function Selfish_Node_analysis shows to what extent all nodes in a
+%simulation have already detected all selfish nodes.
+
+%   m_record: the data matrix read from a 'xxx_selfish_node record.csv' file.
+%   m_detection: the data matrix read from a 'xxx_SelfishNode_DetectionTime.csv' file.
+%   max_time: total running time of one simulation.
+%   interval: number of time interval displayed in figures plotted 
+%   (default: 5).
+%   node_size: total number of nodes in one simulation.
+%   selfish_size: number of selfish nodes.
+
+%   average percentage of detected selfish nodes for all nodes during
+%   specific time intervals.
+
 [r,c] = size(m_record);
 if r~=selfish_size
     disp('number of selfish nodes do not match, maybe due to providing wrong files');

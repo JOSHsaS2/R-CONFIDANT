@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ## USAGE: ./tshark.sh /path/to/Pcap/files/directory/pcap_file_prefix_name node_size /path/to/csv/files/directory/csv_prefix_name
 #place analysis_packet.sh in the same directory

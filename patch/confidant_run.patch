@@ -1,0 +1,2060 @@
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/energy/energy-model-example.cc ns-allinone-3.22/ns-3.22/examples/energy/energy-model-example.cc
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/energy/energy-model-example.cc	2016-01-07 15:07:12.752094453 +1030
++++ ns-allinone-3.22/ns-3.22/examples/energy/energy-model-example.cc	2015-12-14 18:58:52.509158629 +1030
+@@ -95,10 +95,15 @@
+ 
+ /// Trace function for remaining energy at node.
+ void
+-RemainingEnergy (double oldValue, double remainingEnergy)
++RemainingEnergy ( double oldValue, double remainingEnergy)
+ {
+-  NS_LOG_UNCOND (Simulator::Now ().GetSeconds ()
+-                 << "s Current remaining energy = " << remainingEnergy << "J");
++  NS_LOG_UNCOND("RemainingEnergy(): "<<oldValue <<","<< remainingEnergy);
++	NS_LOG_UNCOND (Simulator::Now ().GetSeconds ()
++                  <<"s Current remaining energy = " << remainingEnergy << "J");
++  /*NS_LOG_UNCOND ((Simulator::Now ()).GetMicroSeconds()
++                    <<"s Current remaining energy = " << remainingEnergy << "J");
++  NS_LOG_UNCOND ((Simulator::Now ()).GetMicroSeconds()/1000000 <<"."<<(Simulator::Now ()).GetMicroSeconds()%1000000
++                   <<"s Current remaining energy = " << remainingEnergy << "J");*/
+ }
+ 
+ /// Trace function for total energy consumption at node.
+@@ -118,7 +123,7 @@
+   LogComponentEnable ("DeviceEnergyModel", LOG_LEVEL_DEBUG);
+   LogComponentEnable ("WifiRadioEnergyModel", LOG_LEVEL_DEBUG);
+    */
+-
++  //Config::SetDefault ("ns3::BasicEnergySource::PeriodicEnergyUpdateInterval", TimeValue(Seconds(20.0)));
+   std::string phyMode ("DsssRate1Mbps");
+   double Prss = -80;            // dBm
+   uint32_t PpacketSize = 200;   // bytes
+@@ -214,7 +219,8 @@
+   /* energy source */
+   BasicEnergySourceHelper basicSourceHelper;
+   // configure energy source
+-  basicSourceHelper.Set ("BasicEnergySourceInitialEnergyJ", DoubleValue (0.1));
++  basicSourceHelper.Set ("BasicEnergySourceInitialEnergyJ", DoubleValue (10));
++  basicSourceHelper.Set ("PeriodicEnergyUpdateInterval", TimeValue(Seconds(3.0)));
+   // install source
+   EnergySourceContainer sources = basicSourceHelper.Install (c);
+   /* device energy model */
+@@ -253,9 +259,9 @@
+   basicSourcePtr->TraceConnectWithoutContext ("RemainingEnergy", MakeCallback (&RemainingEnergy));
+   // device energy model
+   Ptr<DeviceEnergyModel> basicRadioModelPtr =
+-    basicSourcePtr->FindDeviceEnergyModels ("ns3::WifiRadioEnergyModel").Get (0);
++   basicSourcePtr->FindDeviceEnergyModels ("ns3::WifiRadioEnergyModel").Get (0);
+   NS_ASSERT (basicRadioModelPtr != NULL);
+-  basicRadioModelPtr->TraceConnectWithoutContext ("TotalEnergyConsumption", MakeCallback (&TotalEnergy));
++ //basicRadioModelPtr->TraceConnectWithoutContext ("TotalEnergyConsumption", MakeCallback (&TotalEnergy));
+   /***************************************************************************/
+ 
+ 
+@@ -264,7 +270,7 @@
+   Simulator::Schedule (Seconds (startTime), &GenerateTraffic, source, PpacketSize,
+                        networkNodes.Get (0), numPackets, interPacketInterval);
+ 
+-  Simulator::Stop (Seconds (10.0));
++  Simulator::Stop (Seconds (90.0));
+   Simulator::Run ();
+   Simulator::Destroy ();
+ 
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc	2016-01-07 15:07:12.756094453 +1030
++++ ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc	2016-01-05 01:07:15.057729468 +1030
+@@ -1,400 +1,666 @@
+-/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+-/*
+- * Copyright (c) 2011 University of Kansas
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation;
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+- * Author: Justin Rohrer <rohrej@ittc.ku.edu>
+- *
+- * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
+- * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
+- * Information and Telecommunication Technology Center (ITTC)
+- * and Department of Electrical Engineering and Computer Science
+- * The University of Kansas Lawrence, KS USA.
+- *
+- * Work supported in part by NSF FIND (Future Internet Design) Program
+- * under grant CNS-0626918 (Postmodern Internet Architecture),
+- * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
+- * US Department of Defense (DoD), and ITTC at The University of Kansas.
+- */
+-
+-/*
+- * This example program allows one to run ns-3 DSDV, AODV, or OLSR under
+- * a typical random waypoint mobility model.
+- *
+- * By default, the simulation runs for 200 simulated seconds, of which
+- * the first 50 are used for start-up time.  The number of nodes is 50.
+- * Nodes move according to RandomWaypointMobilityModel with a speed of
+- * 20 m/s and no pause time within a 300x1500 m region.  The WiFi is
+- * in ad hoc mode with a 2 Mb/s rate (802.11b) and a Friis loss model.
+- * The transmit power is set to 7.5 dBm.
+- *
+- * It is possible to change the mobility and density of the network by
+- * directly modifying the speed and the number of nodes.  It is also
+- * possible to change the characteristics of the network by changing
+- * the transmit power (as power increases, the impact of mobility
+- * decreases and the effective density increases).
+- *
+- * By default, OLSR is used, but specifying a value of 2 for the protocol
+- * will cause AODV to be used, and specifying a value of 3 will cause
+- * DSDV to be used.
+- *
+- * By default, there are 10 source/sink data pairs sending UDP data
+- * at an application rate of 2.048 Kb/s each.    This is typically done
+- * at a rate of 4 64-byte packets per second.  Application data is
+- * started at a random time between 50 and 51 seconds and continues
+- * to the end of the simulation.
+- *
+- * The program outputs a few items:
+- * - packet receptions are notified to stdout such as:
+- *   <timestamp> <node-id> received one packet from <src-address>
+- * - each second, the data reception statistics are tabulated and output
+- *   to a comma-separated value (csv) file
+- * - some tracing and flow monitor configuration that used to work is
+- *   left commented inline in the program
+- */
+-
+-#include <fstream>
+-#include <iostream>
+-#include "ns3/core-module.h"
+-#include "ns3/network-module.h"
+-#include "ns3/internet-module.h"
+-#include "ns3/mobility-module.h"
+-#include "ns3/wifi-module.h"
+-#include "ns3/aodv-module.h"
+-#include "ns3/olsr-module.h"
+-#include "ns3/dsdv-module.h"
+-#include "ns3/dsr-module.h"
+-#include "ns3/applications-module.h"
+-
+-using namespace ns3;
+-using namespace dsr;
+-
+-NS_LOG_COMPONENT_DEFINE ("manet-routing-compare");
+-
+-class RoutingExperiment
+-{
+-public:
+-  RoutingExperiment ();
+-  void Run (int nSinks, double txp, std::string CSVfileName);
+-  //static void SetMACParam (ns3::NetDeviceContainer & devices,
+-  //                                 int slotDistance);
+-  std::string CommandSetup (int argc, char **argv);
+-
+-private:
+-  Ptr<Socket> SetupPacketReceive (Ipv4Address addr, Ptr<Node> node);
+-  void ReceivePacket (Ptr<Socket> socket);
+-  void CheckThroughput ();
+-
+-  uint32_t port;
+-  uint32_t bytesTotal;
+-  uint32_t packetsReceived;
+-
+-  std::string m_CSVfileName;
+-  int m_nSinks;
+-  std::string m_protocolName;
+-  double m_txp;
+-  bool m_traceMobility;
+-  uint32_t m_protocol;
+-};
+-
+-RoutingExperiment::RoutingExperiment ()
+-  : port (9),
+-    bytesTotal (0),
+-    packetsReceived (0),
+-    m_CSVfileName ("manet-routing.output.csv"),
+-    m_traceMobility (false),
+-    m_protocol (2) // AODV
+-{
+-}
+-
+-static inline std::string
+-PrintReceivedPacket (Ptr<Socket> socket, Ptr<Packet> packet)
+-{
+-  SocketAddressTag tag;
+-  bool found;
+-  found = packet->PeekPacketTag (tag);
+-  std::ostringstream oss;
+-
+-  oss << Simulator::Now ().GetSeconds () << " " << socket->GetNode ()->GetId ();
+-
+-  if (found)
+-    {
+-      InetSocketAddress addr = InetSocketAddress::ConvertFrom (tag.GetAddress ());
+-      oss << " received one packet from " << addr.GetIpv4 ();
+-    }
+-  else
+-    {
+-      oss << " received one packet!";
+-    }
+-  return oss.str ();
+-}
+-
+-void
+-RoutingExperiment::ReceivePacket (Ptr<Socket> socket)
+-{
+-  Ptr<Packet> packet;
+-  while ((packet = socket->Recv ()))
+-    {
+-      bytesTotal += packet->GetSize ();
+-      packetsReceived += 1;
+-      NS_LOG_UNCOND (PrintReceivedPacket (socket, packet));
+-    }
+-}
+-
+-void
+-RoutingExperiment::CheckThroughput ()
+-{
+-  double kbs = (bytesTotal * 8.0) / 1000;
+-  bytesTotal = 0;
+-
+-  std::ofstream out (m_CSVfileName.c_str (), std::ios::app);
+-
+-  out << (Simulator::Now ()).GetSeconds () << ","
+-      << kbs << ","
+-      << packetsReceived << ","
+-      << m_nSinks << ","
+-      << m_protocolName << ","
+-      << m_txp << ""
+-      << std::endl;
+-
+-  out.close ();
+-  packetsReceived = 0;
+-  Simulator::Schedule (Seconds (1.0), &RoutingExperiment::CheckThroughput, this);
+-}
+-
+-Ptr<Socket>
+-RoutingExperiment::SetupPacketReceive (Ipv4Address addr, Ptr<Node> node)
+-{
+-  TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+-  Ptr<Socket> sink = Socket::CreateSocket (node, tid);
+-  InetSocketAddress local = InetSocketAddress (addr, port);
+-  sink->Bind (local);
+-  sink->SetRecvCallback (MakeCallback (&RoutingExperiment::ReceivePacket, this));
+-
+-  return sink;
+-}
+-
+-std::string
+-RoutingExperiment::CommandSetup (int argc, char **argv)
+-{
+-  CommandLine cmd;
+-  cmd.AddValue ("CSVfileName", "The name of the CSV output file name", m_CSVfileName);
+-  cmd.AddValue ("traceMobility", "Enable mobility tracing", m_traceMobility);
+-  cmd.AddValue ("protocol", "1=OLSR;2=AODV;3=DSDV;4=DSR", m_protocol);
+-  cmd.Parse (argc, argv);
+-  return m_CSVfileName;
+-}
+-
+-int
+-main (int argc, char *argv[])
+-{
+-  RoutingExperiment experiment;
+-  std::string CSVfileName = experiment.CommandSetup (argc,argv);
+-
+-  //blank out the last output file and write the column headers
+-  std::ofstream out (CSVfileName.c_str ());
+-  out << "SimulationSecond," <<
+-  "ReceiveRate," <<
+-  "PacketsReceived," <<
+-  "NumberOfSinks," <<
+-  "RoutingProtocol," <<
+-  "TransmissionPower" <<
+-  std::endl;
+-  out.close ();
+-
+-  int nSinks = 10;
+-  double txp = 7.5;
+-
+-  experiment.Run (nSinks, txp, CSVfileName);
+-}
+-
+-void
+-RoutingExperiment::Run (int nSinks, double txp, std::string CSVfileName)
+-{
+-  Packet::EnablePrinting ();
+-  m_nSinks = nSinks;
+-  m_txp = txp;
+-  m_CSVfileName = CSVfileName;
+-
+-  int nWifis = 50;
+-
+-  double TotalTime = 200.0;
+-  std::string rate ("2048bps");
+-  std::string phyMode ("DsssRate11Mbps");
+-  std::string tr_name ("manet-routing-compare");
+-  int nodeSpeed = 20; //in m/s
+-  int nodePause = 0; //in s
+-  m_protocolName = "protocol";
+-
+-  Config::SetDefault  ("ns3::OnOffApplication::PacketSize",StringValue ("64"));
+-  Config::SetDefault ("ns3::OnOffApplication::DataRate",  StringValue (rate));
+-
+-  //Set Non-unicastMode rate to unicast mode
+-  Config::SetDefault ("ns3::WifiRemoteStationManager::NonUnicastMode",StringValue (phyMode));
+-
+-  NodeContainer adhocNodes;
+-  adhocNodes.Create (nWifis);
+-
+-  // setting up wifi phy and channel using helpers
+-  WifiHelper wifi;
+-  wifi.SetStandard (WIFI_PHY_STANDARD_80211b);
+-
+-  YansWifiPhyHelper wifiPhy =  YansWifiPhyHelper::Default ();
+-  YansWifiChannelHelper wifiChannel;
+-  wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
+-  wifiChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
+-  wifiPhy.SetChannel (wifiChannel.Create ());
+-
+-  // Add a non-QoS upper mac, and disable rate control
+-  NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default ();
+-  wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager",
+-                                "DataMode",StringValue (phyMode),
+-                                "ControlMode",StringValue (phyMode));
+-
+-  wifiPhy.Set ("TxPowerStart",DoubleValue (txp));
+-  wifiPhy.Set ("TxPowerEnd", DoubleValue (txp));
+-
+-  wifiMac.SetType ("ns3::AdhocWifiMac");
+-  NetDeviceContainer adhocDevices = wifi.Install (wifiPhy, wifiMac, adhocNodes);
+-
+-  MobilityHelper mobilityAdhoc;
+-  int64_t streamIndex = 0; // used to get consistent mobility across scenarios
+-
+-  ObjectFactory pos;
+-  pos.SetTypeId ("ns3::RandomRectanglePositionAllocator");
+-  pos.Set ("X", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=300.0]"));
+-  pos.Set ("Y", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=1500.0]"));
+-
+-  Ptr<PositionAllocator> taPositionAlloc = pos.Create ()->GetObject<PositionAllocator> ();
+-  streamIndex += taPositionAlloc->AssignStreams (streamIndex);
+-
+-  std::stringstream ssSpeed;
+-  ssSpeed << "ns3::UniformRandomVariable[Min=0.0|Max=" << nodeSpeed << "]";
+-  std::stringstream ssPause;
+-  ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
+-  mobilityAdhoc.SetMobilityModel ("ns3::RandomWaypointMobilityModel",
+-                                  "Speed", StringValue (ssSpeed.str ()),
+-                                  "Pause", StringValue (ssPause.str ()),
+-                                  "PositionAllocator", PointerValue (taPositionAlloc));
+-  mobilityAdhoc.SetPositionAllocator (taPositionAlloc);
+-  mobilityAdhoc.Install (adhocNodes);
+-  streamIndex += mobilityAdhoc.AssignStreams (adhocNodes, streamIndex);
+-
+-  AodvHelper aodv;
+-  OlsrHelper olsr;
+-  DsdvHelper dsdv;
+-  DsrHelper dsr;
+-  DsrMainHelper dsrMain;
+-  Ipv4ListRoutingHelper list;
+-  InternetStackHelper internet;
+-
+-  switch (m_protocol)
+-    {
+-    case 1:
+-      list.Add (olsr, 100);
+-      m_protocolName = "OLSR";
+-      break;
+-    case 2:
+-      list.Add (aodv, 100);
+-      m_protocolName = "AODV";
+-      break;
+-    case 3:
+-      list.Add (dsdv, 100);
+-      m_protocolName = "DSDV";
+-      break;
+-    case 4:
+-      m_protocolName = "DSR";
+-      break;
+-    default:
+-      NS_FATAL_ERROR ("No such protocol:" << m_protocol);
+-    }
+-
+-  if (m_protocol < 4)
+-    {
+-      internet.SetRoutingHelper (list);
+-      internet.Install (adhocNodes);
+-    }
+-  else if (m_protocol == 4)
+-    {
+-      internet.Install (adhocNodes);
+-      dsrMain.Install (dsr, adhocNodes);
+-    }
+-
+-  NS_LOG_INFO ("assigning ip address");
+-
+-  Ipv4AddressHelper addressAdhoc;
+-  addressAdhoc.SetBase ("10.1.1.0", "255.255.255.0");
+-  Ipv4InterfaceContainer adhocInterfaces;
+-  adhocInterfaces = addressAdhoc.Assign (adhocDevices);
+-
+-  OnOffHelper onoff1 ("ns3::UdpSocketFactory",Address ());
+-  onoff1.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"));
+-  onoff1.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0.0]"));
+-
+-  for (int i = 0; i < nSinks; i++)
+-    {
+-      Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
+-
+-      AddressValue remoteAddress (InetSocketAddress (adhocInterfaces.GetAddress (i), port));
+-      onoff1.SetAttribute ("Remote", remoteAddress);
+-
+-      Ptr<UniformRandomVariable> var = CreateObject<UniformRandomVariable> ();
+-      ApplicationContainer temp = onoff1.Install (adhocNodes.Get (i + nSinks));
+-      temp.Start (Seconds (var->GetValue (100.0,101.0)));
+-      temp.Stop (Seconds (TotalTime));
+-    }
+-
+-  std::stringstream ss;
+-  ss << nWifis;
+-  std::string nodes = ss.str ();
+-
+-  std::stringstream ss2;
+-  ss2 << nodeSpeed;
+-  std::string sNodeSpeed = ss2.str ();
+-
+-  std::stringstream ss3;
+-  ss3 << nodePause;
+-  std::string sNodePause = ss3.str ();
+-
+-  std::stringstream ss4;
+-  ss4 << rate;
+-  std::string sRate = ss4.str ();
+-
+-  //NS_LOG_INFO ("Configure Tracing.");
+-  //tr_name = tr_name + "_" + m_protocolName +"_" + nodes + "nodes_" + sNodeSpeed + "speed_" + sNodePause + "pause_" + sRate + "rate";
+-
+-  //AsciiTraceHelper ascii;
+-  //Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
+-  //wifiPhy.EnableAsciiAll (osw);
+-  AsciiTraceHelper ascii;
+-  MobilityHelper::EnableAsciiAll (ascii.CreateFileStream (tr_name + ".mob"));
+-
+-  //Ptr<FlowMonitor> flowmon;
+-  //FlowMonitorHelper flowmonHelper;
+-  //flowmon = flowmonHelper.InstallAll ();
+-
+-
+-  NS_LOG_INFO ("Run Simulation.");
+-
+-  CheckThroughput ();
+-
+-  Simulator::Stop (Seconds (TotalTime));
+-  Simulator::Run ();
+-
+-  //flowmon->SerializeToXmlFile ((tr_name + ".flowmon").c_str(), false, false);
+-
+-  Simulator::Destroy ();
+-}
+-
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011 University of Kansas
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Justin Rohrer <rohrej@ittc.ku.edu>
++ *
++ * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
++ * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
++ * Information and Telecommunication Technology Center (ITTC)
++ * and Department of Electrical Engineering and Computer Science
++ * The University of Kansas Lawrence, KS USA.
++ *
++ * Work supported in part by NSF FIND (Future Internet Design) Program
++ * under grant CNS-0626918 (Postmodern Internet Architecture),
++ * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
++ * US Department of Defense (DoD), and ITTC at The University of Kansas.
++ */
++
++/*
++ * This example program allows one to run ns-3 DSDV, AODV, or OLSR under
++ * a typical random waypoint mobility model.
++ *
++ * By default, the simulation runs for 200 simulated seconds, of which
++ * the first 50 are used for start-up time.  The number of nodes is 50.
++ * Nodes move according to RandomWaypointMobilityModel with a speed of
++ * 20 m/s and no pause time within a 300x1500 m region.  The WiFi is
++ * in ad hoc mode with a 2 Mb/s rate (802.11b) and a Friis loss model.
++ * The transmit power is set to 7.5 dBm.
++ *
++ * It is possible to change the mobility and density of the network by
++ * directly modifying the speed and the number of nodes.  It is also
++ * possible to change the characteristics of the network by changing
++ * the transmit power (as power increases, the impact of mobility
++ * decreases and the effective density increases).
++ *
++ * By default, OLSR is used, but specifying a value of 2 for the protocol
++ * will cause AODV to be used, and specifying a value of 3 will cause
++ * DSDV to be used.
++ *
++ * By default, there are 10 source/sink data pairs sending UDP data
++ * at an application rate of 2.048 Kb/s each.    This is typically done
++ * at a rate of 4 64-byte packets per second.  Application data is
++ * started at a random time between 50 and 51 seconds and continues
++ * to the end of the simulation.
++ *
++ * The program outputs a few items:
++ * - packet receptions are notified to stdout such as:
++ *   <timestamp> <node-id> received one packet from <src-address>
++ * - each second, the data reception statistics are tabulated and output
++ *   to a comma-separated value (csv) file
++ * - some tracing and flow monitor configuration that used to work is
++ *   left commented inline in the program
++ */
++#include "manet-routing-compare.h"
++
++static inline std::string PrintReceivedPacket(Ptr<Socket> socket,
++		Ptr<Packet> packet) {
++	SocketAddressTag tag;
++	bool found;
++	found = packet->PeekPacketTag(tag);
++	std::ostringstream oss;
++
++	oss << Simulator::Now().GetSeconds() << " " << socket->GetNode()->GetId();
++
++	if (found) {
++		InetSocketAddress addr = InetSocketAddress::ConvertFrom(
++				tag.GetAddress());
++		oss << " received one packet from " << addr.GetIpv4();
++	} else {
++		oss << " received one packet!";
++	}
++	return oss.str();
++}
++
++void RoutingExperiment::ReceivePacket(Ptr<Socket> socket) {
++	Ptr<Packet> packet;
++	while ((packet = socket->Recv())) {
++		bytesTotal += packet->GetSize();
++		packetsReceived += 1;
++		NS_LOG_UNCOND(PrintReceivedPacket(socket, packet));
++	}
++}
++
++void RoutingExperiment::CheckThroughput() {
++	double kbs = (bytesTotal * 8.0) / 1000;
++	bytesTotal = 0;
++
++	std::ofstream out(m_CSVfileName.c_str(), std::ios::app);
++
++	out << (Simulator::Now()).GetSeconds() << "," << kbs << ","
++			<< packetsReceived << "," << m_nSinks << "," << m_protocolName
++			<< "," << m_txp << "" << std::endl;
++
++	std::cout << "Total number of packets recieved successfully = "
++			<< packetsReceived << std::endl;
++	out.close();
++	packetsReceived = 0;
++	Simulator::Schedule(Seconds(1.0), &RoutingExperiment::CheckThroughput,
++			this);
++}
++
++//traced callback methods for trace source in CONFIDANT and Energy remaining
++
++void RoutingExperiment::TableSizeChange_LUT(const uint32_t node_id,
++		const ns3::Time c_time, const uint32_t n_size) {
++	out_LUT.open(monitor_LUT.c_str(), std::ios::app);
++
++	out_LUT << node_id << "," << c_time.GetMicroSeconds() / 1000000 << "."
++			<< c_time.GetMicroSeconds() % 1000000 << "," << n_size << ""
++			<< std::endl;
++	out_LUT.close();
++}
++
++void RoutingExperiment::TableSizeChange_FirstHand(const uint32_t node_id,
++		const ns3::Time c_time, const uint32_t n_size) {
++	NS_LOG_FUNCTION(this << node_id << c_time << n_size);
++	out_First.open(repu_First.c_str(), std::ios::app);
++
++	out_First << node_id << "," << c_time.GetMicroSeconds() / 1000000 << "."
++			<< c_time.GetMicroSeconds() % 1000000 << "," << n_size << ""
++			<< std::endl;
++	out_First.close();
++}
++
++void RoutingExperiment::TableSizeChange_Rating(const uint32_t node_id,
++		const ns3::Time c_time, const uint32_t n_size) {
++	out_Rating.open(repu_Rate.c_str(), std::ios::app);
++
++	out_Rating << node_id << "," << c_time.GetMicroSeconds() / 1000000 << "."
++			<< c_time.GetMicroSeconds() % 1000000 << "," << n_size << ""
++			<< std::endl;
++	out_Rating.close();
++}
++
++void RoutingExperiment::TableSizeChange_Trust(const uint32_t node_id,
++		const ns3::Time c_time, const uint32_t n_size) {
++	out_Trust.open(trust.c_str(), std::ios::app);
++
++	out_Trust << node_id << "," << c_time.GetMicroSeconds() / 1000000 << "."
++			<< c_time.GetMicroSeconds() % 1000000 << "," << n_size << ""
++			<< std::endl;
++	out_Trust.close();
++}
++
++void RoutingExperiment::AddSelfishNode(const uint32_t node_id,
++		const ns3::Time d_time, const Ipv4Address selfishnode, bool add) {
++	NS_LOG_FUNCTION(this << node_id << selfishnode << add);
++	uint32_t nodeId = getNodeId(selfishnode);
++	std::string flag = "+";
++	if(!add)
++		flag = "-";
++	out_Dtection.open(detection.c_str(), std::ios::app);
++
++	out_Dtection << node_id << "," << d_time.GetMicroSeconds() / 1000000 << "."
++			<< d_time.GetMicroSeconds() % 1000000 << "," << flag << nodeId << ""
++			<< std::endl;
++	out_Dtection.close();
++}
++
++void RoutingExperiment::RemainingPowerChange(std::string context,
++		const double oldValue, const double newValue) {
++	out_energy.open(energy.c_str(), std::ios::app);
++	std::string node_id = context;
++	// get the context string and extract node id;
++	out_energy << node_id << ","
++			<< (Simulator::Now()).GetMicroSeconds() / 1000000 << "."
++			<< (Simulator::Now()).GetMicroSeconds() % 1000000 << "," << newValue
++			<< "" << std::endl;
++	out_energy.close();
++}
++
++Ptr<Socket> RoutingExperiment::SetupPacketReceive(Ipv4Address addr,
++		Ptr<Node> node) {
++	TypeId tid = TypeId::LookupByName("ns3::UdpSocketFactory");
++	Ptr<Socket> sink = Socket::CreateSocket(node, tid);
++	InetSocketAddress local = InetSocketAddress(addr, port);
++	sink->Bind(local);
++	sink->SetRecvCallback(
++			MakeCallback(&RoutingExperiment::ReceivePacket, this));
++
++	return sink;
++}
++
++void RoutingExperiment::setAllContainer(NodeContainer* nc,
++		NetDeviceContainer* ndc, Ipv4InterfaceContainer* ipic) {
++	this->nc = nc;
++	this->ndc = ndc;
++	this->ipic = ipic;
++}
++
++uint32_t RoutingExperiment::getNodeId(Ipv4Address node_ip) {
++	for (uint32_t i = 0; i < ipic->GetN(); i++) {
++		if (ipic->GetAddress(i) == node_ip) {
++			Ptr<NetDevice> n_p = ndc->Get(i);
++			return (n_p->GetNode())->GetId();
++		}
++	}
++	NS_LOG_ERROR("No node with ip found!");
++	NS_ASSERT(false);
++	return -1;
++}
++
++void RoutingExperiment::initialize_files() {
++	out_LUT.open(monitor_LUT.c_str());
++	out_LUT << "NodeId," << "Time," << "Size" << std::endl;
++	out_LUT.close();
++
++	out_First.open(repu_First.c_str());
++	out_First << "NodeId," << "Time," << "Size" << std::endl;
++	out_First.close();
++
++	out_Rating.open(repu_Rate.c_str());
++	out_Rating << "NodeId," << "Time," << "Size" << std::endl;
++	out_Rating.close();
++
++	out_Dtection.open(detection.c_str());
++	out_Dtection << "NodeId," << "DetectionTime," << "SelfishNodeId"
++			<< std::endl;
++	out_Dtection.close();
++
++	out_energy.open(energy.c_str());
++	out_energy << "NodeId," << "Time," << "RemainingPower" << std::endl;
++	out_energy.close();
++
++	out_Trust.open(trust.c_str());
++	out_Trust << "NodeId," << "Time," << "Size" << std::endl;
++	out_Trust.close();
++}
++
++std::string RoutingExperiment::CommandSetup(int argc, char **argv) {
++	CommandLine cmd;
++	cmd.AddValue("CSVfileName", "The name of the CSV output file name",
++			m_CSVfileName);
++	cmd.AddValue("pcap", "Write PCAP traces.", pcap);
++	cmd.AddValue("traceMobility", "Enable m obility tracing", m_traceMobility);
++
++	// AODV-CONFIDANT VARIED PARAMETERS
++	cmd.AddValue("totalNodes", "Total Nodes",
++			uofa_totalNumberOfNodes);
++	cmd.AddValue("sinks",
++			"Total Number of Sinks. Notes: must less than half of total number of nodes",
++			uofa_numberOfSinks);
++	cmd.AddValue("malicious", "Number of Malicious Nodes",
++			uofa_numberOfMaliciousNodes);
++	cmd.AddValue("power", "Node Transmission Power",
++			uofa_simu_transmissionPower);
++	cmd.AddValue("protocol", "0=AODV; 1=CONFIDANT; 2=L-CONFIDANT; 3=TradeOff",
++			m_protocol);
++	cmd.AddValue("pauseTime", "range: from 0 to 900 s", nodePauseTime);
++
++	cmd.AddValue("mvtSpeedMax", "Max Node Movement Speed",
++			uofa_nodeMovementSpeedMax);
++	cmd.AddValue("mvtSpeedMin", "Min Node Movement Speed",
++			uofa_nodeMovementSpeedMin);
++	cmd.AddValue("sizeX", "Simulation Area X-size", uofa_simu_areaSizeX);
++	cmd.AddValue("sizeY", "Simulation Area Y-size", uofa_simu_areaSizeY);
++	cmd.AddValue("totalTime", "Total Simulation Time",
++			uofa_simu_totalSimulationTime);
++	cmd.AddValue("startupMin", "Node Startup Min Time",
++			uofa_simu_nodeStartupTime_Min);
++	cmd.AddValue("startupMax", "Node Startup Max Time",
++			uofa_simu_nodeStartupTime_Max);
++
++	cmd.Parse(argc, argv);
++
++	dictory_name = "T" + NumberToString(uofa_totalNumberOfNodes) + "_M"
++			+ NumberToString(uofa_numberOfMaliciousNodes) + "_PT"
++			+ NumberToString(nodePauseTime) + "_S"
++			+ NumberToString(uofa_numberOfSinks) + "_";
++
++	return m_CSVfileName;
++}
++
++int main(int argc, char *argv[]) {
++	RoutingExperiment experiment;
++
++	//CONFIDANT: invoke command setup method
++	std::string CSVfileName = experiment.CommandSetup(argc, argv);
++	//experiment.initialize_files();
++
++	//blank out the last output file and write the column headers
++	/*
++	 std::ofstream out (CSVfileName.c_str ());
++	 out << "SimulationSecond," <<
++	 "ReceiveRate," <<
++	 "PacketsReceived," <<
++	 "NumberOfSinks," <<
++	 "RoutingProtocol," <<
++	 "TransmissionPower" <<
++	 std::endl;
++	 out.close ();
++	 */
++	int nSinks = experiment.uofa_numberOfSinks;
++	double txp = experiment.uofa_simu_transmissionPower;
++
++	experiment.Run(nSinks, txp, CSVfileName);
++}
++
++
++void RoutingExperiment::Run(int nSinks, double txp, std::string CSVfileName) {
++	Packet::EnablePrinting();
++	m_nSinks = nSinks;
++	m_txp = txp;
++	m_CSVfileName = CSVfileName;
++
++	int nWifis = uofa_totalNumberOfNodes;
++
++	double TotalTime = uofa_simu_totalSimulationTime;
++	std::string rate("2048bps");
++	std::string phyMode("DsssRate11Mbps");
++	std::string tr_name;
++	//CONFIDANT: CHANGE TO A RANGE
++	int nodeSpeedMax = uofa_nodeMovementSpeedMax; //in m/s
++	int nodeSpeedMin = uofa_nodeMovementSpeedMin;
++	int nodePause = nodePauseTime; //in s
++	m_protocolName = "protocol";
++
++	Config::SetDefault("ns3::OnOffApplication::PacketSize", StringValue("64"));
++	Config::SetDefault("ns3::OnOffApplication::DataRate", StringValue(rate));
++
++	//Set Non-unicastMode rate to unicast mode
++	Config::SetDefault("ns3::WifiRemoteStationManager::NonUnicastMode",
++			StringValue(phyMode));
++
++	//LogComponentEnable("AodvRoutingProtocol", LOG_LOGIC);
++	LogComponentEnable("CONFIDANT_MONITOR", LOG_LEVEL_LOGIC);
++	LogComponentEnable("CONFIDANT_REPUTATIONSYSTEM", LOG_LEVEL_LOGIC);
++	LogComponentEnable("CONFIDANT_TRUSTMANAGER", LOG_LEVEL_FUNCTION);
++	LogComponentEnable("CONFIDANT_PATHMANAGER", LOG_LEVEL_FUNCTION);
++	LogComponentEnable("CONFIDANT_confidant", LOG_LEVEL_FUNCTION);
++
++//------------------------------------------------------------------------------------------------------------------------------------
++
++	// Create separate containers for normal and blackhole
++	NodeContainer adhocNodes;
++	NodeContainer normalNodesContainer;
++	NodeContainer maliciousNodesContainer;
++
++	//ADD MALICIOUS NODES SELECTIVELY BASED ON GENERATED IDs
++	std::vector<int> mal; //(uofa_maliciousNodeIDs, uofa_maliciousNodeIDs + sizeof(uofa_maliciousNodeIDs) / sizeof(int));
++	std::vector<int>::iterator mal_it;
++
++	for (int i = 0; i < uofa_numberOfMaliciousNodes; i++) {
++		int r;
++		do {
++			r = rand() % nWifis;
++			mal_it = find(mal.begin(), mal.begin() + i, r);
++		} while (mal_it != mal.end());
++		mal.push_back(r);
++	}
++
++	std::cout << "Malicious Node IDs:" << std::endl;
++	for (unsigned int i = 0; i < mal.size(); i++) {
++		std::cout << mal[i] << std::endl;
++	}
++
++	// Add normal and blackhole nodes to respective containers
++	adhocNodes.Create(nWifis);
++
++	for (int i = 0; i < nWifis; i++) {
++		mal_it = find(mal.begin(), mal.end(), i);
++		if (mal_it != mal.end()) {
++			maliciousNodesContainer.Add(adhocNodes.Get(i));
++		} else {
++			normalNodesContainer.Add(adhocNodes.Get(i));
++		}
++	}
++
++///------------------------------------------------------------------------------------------------------------------------------------
++
++	// setting up wifi phy and channel using helpers
++	WifiHelper wifi;
++	wifi.SetStandard(WIFI_PHY_STANDARD_80211b);
++
++	YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default();
++	YansWifiChannelHelper wifiChannel;
++	wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
++	wifiChannel.AddPropagationLoss("ns3::FriisPropagationLossModel");
++	wifiPhy.SetChannel(wifiChannel.Create());
++
++	// Add a non-QoS upper mac, and disable rate control
++	NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default();
++	wifi.SetRemoteStationManager("ns3::ConstantRateWifiManager", "DataMode",
++			StringValue(phyMode), "ControlMode", StringValue(phyMode));
++
++	wifiPhy.Set("TxPowerStart", DoubleValue(txp));
++	wifiPhy.Set("TxPowerEnd", DoubleValue(txp));
++
++	wifiMac.SetType("ns3::AdhocWifiMac");
++	NetDeviceContainer adhocDevices = wifi.Install(wifiPhy, wifiMac,
++			adhocNodes);
++
++///--------------------------------------------------------------------------------------------------------------------------------------
++
++	MobilityHelper mobilityAdhoc;
++	int64_t streamIndex = 0; // used to get consistent mobility across scenarios
++
++	ObjectFactory pos;
++	pos.SetTypeId("ns3::RandomRectanglePositionAllocator");
++	pos.Set("X",
++			StringValue(
++					"ns3::UniformRandomVariable[Min=0.0|Max="
++							+ uofa_simu_areaSizeX + "]")); // CHANGE POSITIONS HERE
++	pos.Set("Y",
++			StringValue(
++					"ns3::UniformRandomVariable[Min=0.0|Max="
++							+ uofa_simu_areaSizeY + "]")); // CHANGE POSITIONS HERE
++
++	Ptr<PositionAllocator> taPositionAlloc = pos.Create()->GetObject<
++			PositionAllocator>();
++	streamIndex += taPositionAlloc->AssignStreams(streamIndex);
++
++	std::stringstream ssSpeed;
++	ssSpeed << "ns3::UniformRandomVariable[Min=" << nodeSpeedMin << "|Max="
++			<< nodeSpeedMax << "]";
++
++	std::stringstream ssPause;
++	ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
++
++	mobilityAdhoc.SetMobilityModel("ns3::RandomWaypointMobilityModel", "Speed",
++			StringValue(ssSpeed.str()), "Pause", StringValue(ssPause.str()),
++			"PositionAllocator", PointerValue(taPositionAlloc));
++	mobilityAdhoc.SetPositionAllocator(taPositionAlloc);
++	mobilityAdhoc.Install(adhocNodes);
++	streamIndex += mobilityAdhoc.AssignStreams(adhocNodes, streamIndex);
++
++	/** Energy Model **/
++	/***************************************************************************/
++	/* energy source */
++	BasicEnergySourceHelper basicSourceHelper;
++	// configure energy source
++	basicSourceHelper.Set("BasicEnergySourceInitialEnergyJ", DoubleValue(280));
++	basicSourceHelper.Set("PeriodicEnergyUpdateInterval",
++			TimeValue(Seconds(50.0)));
++	EnergySourceContainer sources = basicSourceHelper.Install(adhocNodes);
++	/* device energy model */
++	WifiRadioEnergyModelHelper radioEnergyHelper;
++	// configure radio energy model
++	//radioEnergyHelper.Set ("TxCurrentA", DoubleValue (0.0174));
++	// install device model
++	DeviceEnergyModelContainer deviceModels = radioEnergyHelper.Install(
++			adhocDevices, sources);
++	/***************************************************************************/
++
++///-------------------------------------------------------------------------------------------------------------------------------------
++	AodvHelper aodv;
++	AodvHelper malicious_aodv;
++
++	Ipv4ListRoutingHelper list;
++	InternetStackHelper internet;
++
++	/*
++	 codes to install internet stack and AODV on both regualr and selfish nodes
++	 */
++	switch (m_protocol) {
++	case 0:
++		enableC = false;
++		enableL = false;
++		m_protocolName = "AODV_";
++		break;
++	case 1:
++		enableC = true;
++		enableL = false;
++		m_protocolName = "AODV_CONFIDANT_";
++		break;
++	case 2:
++		enableC = true;
++		enableL = true;
++		m_protocolName = "AODV_L-CONFIDANT_";
++		break;
++	case 3:
++		enableC = true;
++		enableL = true;
++		enableT = true;
++		m_protocolName = "AODV_L-CONFIDANT_TradeOff_";
++		break;
++	default:
++		NS_FATAL_ERROR("No such protocol:" << m_protocol);
++	}
++
++	internet.SetRoutingHelper(aodv);
++	internet.Install(normalNodesContainer);
++
++	for (NodeContainer::Iterator i = normalNodesContainer.Begin();
++			i != normalNodesContainer.End(); ++i) {
++		Ptr<ns3::aodv::RoutingProtocol> p_aodv =
++				(*i)->GetObject<Ipv4>()->GetObject<ns3::aodv::RoutingProtocol>();
++		p_aodv->setC(enableC);
++		p_aodv->setL(enableL);
++		p_aodv->setT(enableT);
++		if (enableC) {
++			Ptr<NetDevice> p_device = (*i)->GetDevice(0);
++			p_device->SetPromiscReceiveCallback(
++					MakeCallback(&ns3::confidant::Monitor::handlePassivePack,
++							p_aodv->getMonitor()));
++		}
++
++	}
++
++	malicious_aodv.Set("IsMalicious", BooleanValue(true));
++	internet.SetRoutingHelper(malicious_aodv);
++	internet.Install(maliciousNodesContainer);
++
++	for (NodeContainer::Iterator i = maliciousNodesContainer.Begin();
++			i != maliciousNodesContainer.End(); ++i) {
++		Ptr<ns3::aodv::RoutingProtocol> p_aodv =
++				(*i)->GetObject<Ipv4>()->GetObject<ns3::aodv::RoutingProtocol>();
++		p_aodv->setC(enableC);
++		p_aodv->setL(enableL);
++		p_aodv->setT(enableT);
++		if (enableC) {
++			Ptr<NetDevice> p_device = (*i)->GetDevice(0);
++			p_device->SetPromiscReceiveCallback(
++					MakeCallback(&ns3::confidant::Monitor::handlePassivePack,
++							p_aodv->getMonitor()));
++		}
++
++	}
++
++///--------------------------------------------------------------------------------------------------------------------------------------
++
++	NS_LOG_INFO("assigning ip address");
++
++	Ipv4AddressHelper addressAdhoc;
++	addressAdhoc.SetBase("10.1.1.0", "255.255.255.0");
++	Ipv4InterfaceContainer adhocInterfaces;
++	adhocInterfaces = addressAdhoc.Assign(adhocDevices);
++	//set node, netdevice, Ipv4Interface container
++	setAllContainer(&adhocNodes, &adhocDevices, &adhocInterfaces);
++
++///-------------------------------------------------------------------------------------------------------------------------------------
++
++	OnOffHelper onoff1("ns3::UdpSocketFactory", Address());
++	onoff1.SetAttribute("OnTime",
++			StringValue("ns3::ConstantRandomVariable[Constant=1.0]"));
++	onoff1.SetAttribute("OffTime",
++			StringValue("ns3::ConstantRandomVariable[Constant=1.0]"));
++
++	for (int i = 0; i < nSinks; i++) {
++		//Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
++
++		AddressValue remoteAddress(
++				InetSocketAddress(adhocInterfaces.GetAddress(i), port));
++		onoff1.SetAttribute("Remote", remoteAddress);
++
++		Ptr<UniformRandomVariable> var = CreateObject<UniformRandomVariable>();
++		ApplicationContainer temp = onoff1.Install(adhocNodes.Get(i + nSinks));
++		temp.Start(
++				Seconds(
++						var->GetValue(uofa_simu_nodeStartupTime_Min,
++								uofa_simu_nodeStartupTime_Max)));
++		temp.Stop(Seconds(TotalTime));
++	}
++
++//--------------------------------------------CONFIG TRACED OUTPUT------------------------------------------------
++
++	std::stringstream ss;
++	ss << nWifis;
++	std::string nodes = ss.str();
++
++	std::stringstream ss2;
++	ss2 << uofa_numberOfMaliciousNodes;
++	std::string nSelfish = ss2.str();
++
++	std::stringstream ss3;
++	ss3 << nodePause;
++	std::string sNodePause = ss3.str();
++
++	NS_LOG_INFO("Configure Tracing.");
++	tr_name = m_protocolName + this->dictory_name;
++
++	if (pcap)
++		wifiPhy.EnablePcapAll(tr_name, false);
++
++	AsciiTraceHelper ascii;
++	MobilityHelper::EnableAsciiAll(ascii.CreateFileStream(tr_name + ".mob"));
++
++	// Ptr<FlowMonitor> flowmon;
++	// FlowMonitorHelper flowmonHelper;
++	// flowmon = flowmonHelper.InstallAll ();
++
++	//AsciiTraceHelper ascii;
++	//Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
++	//wifiPhy.EnableAsciiAll (osw);
++
++	NS_LOG_INFO("Configure Tracing of Memory Overhead.");
++
++	Config::ConnectWithoutContext(
++			"/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::Monitor/LUTSizeChange",
++			MakeCallback(&RoutingExperiment::TableSizeChange_LUT, this));
++
++	Config::ConnectWithoutContext(
++			"/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::ReputationSystem/FTableSizeChange",
++			MakeCallback(&RoutingExperiment::TableSizeChange_FirstHand, this));
++
++	Config::ConnectWithoutContext(
++			"/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::ReputationSystem/RTableSizeChange",
++			MakeCallback(&RoutingExperiment::TableSizeChange_Rating, this));
++
++	Config::ConnectWithoutContext(
++			"/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::PathManager/DetectedSelfishNode",
++			MakeCallback(&RoutingExperiment::AddSelfishNode, this));
++
++	Config::ConnectWithoutContext(
++			"/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::TrustManager/TrustTalbleSizeChange",
++			MakeCallback(&RoutingExperiment::TableSizeChange_Trust, this));
++
++	NS_LOG_INFO("Configure Tracing of Remaining Energy of source.");
++
++	for (EnergySourceContainer::Iterator i = sources.Begin();
++			i != sources.End(); i++) {
++		Ptr<BasicEnergySource> basicSourcePtr = DynamicCast<BasicEnergySource>(
++				*i);
++		uint32_t id = ((*i)->GetNode())->GetId();
++		basicSourcePtr->TraceConnect("RemainingEnergy", NumberToString(id),
++				MakeCallback(&RoutingExperiment::RemainingPowerChange, this));
++	}
++
++	//enable Packet printing
++	Packet::EnablePrinting();
++	dictory_name = m_protocolName + dictory_name;
++	monitor_LUT = dictory_name + monitor_LUT;
++	repu_First = dictory_name + repu_First;
++	repu_Rate = dictory_name + repu_Rate;
++	detection = dictory_name + detection;
++	energy = dictory_name + energy;
++	trust = dictory_name + trust;
++	initialize_files();
++
++	std::ofstream out((dictory_name + "selfish_node record.csv").c_str());
++	out << "NodeId" << std::endl;
++	out.close();
++
++	out.open((dictory_name + "selfish_node record.csv").c_str(), std::ios::app);
++	for (unsigned int i = 0; i < mal.size(); i++) {
++		out << mal[i] << "" << std::endl;
++	}
++	out.close();
++
++	NS_LOG_INFO("Run Simulation.");
++
++	//CheckThroughput ();
++
++	Simulator::Stop(Seconds(TotalTime));
++
++	//AnimationInterface anim("manet-routing-compare.xml"); // FOR GENERATING NETANIM XML FILE
++
++	Simulator::Run();
++
++	// flowmon->SerializeToXmlFile ((tr_name+"_flowmon.xml").c_str(), true, true);
++
++	Simulator::Destroy();
++}
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc~ ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc~
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc~	1970-01-01 09:30:00.000000000 +0930
++++ ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.cc~	2015-11-20 21:14:07.463572000 +1030
+@@ -0,0 +1,660 @@
++/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
++/*
++ * Copyright (c) 2011 University of Kansas
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation;
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * Author: Justin Rohrer <rohrej@ittc.ku.edu>
++ *
++ * James P.G. Sterbenz <jpgs@ittc.ku.edu>, director
++ * ResiliNets Research Group  http://wiki.ittc.ku.edu/resilinets
++ * Information and Telecommunication Technology Center (ITTC)
++ * and Department of Electrical Engineering and Computer Science
++ * The University of Kansas Lawrence, KS USA.
++ *
++ * Work supported in part by NSF FIND (Future Internet Design) Program
++ * under grant CNS-0626918 (Postmodern Internet Architecture),
++ * NSF grant CNS-1050226 (Multilayer Network Resilience Analysis and Experimentation on GENI),
++ * US Department of Defense (DoD), and ITTC at The University of Kansas.
++ */
++
++/*
++ * This example program allows one to run ns-3 DSDV, AODV, or OLSR under
++ * a typical random waypoint mobility model.
++ *
++ * By default, the simulation runs for 200 simulated seconds, of which
++ * the first 50 are used for start-up time.  The number of nodes is 50.
++ * Nodes move according to RandomWaypointMobilityModel with a speed of
++ * 20 m/s and no pause time within a 300x1500 m region.  The WiFi is
++ * in ad hoc mode with a 2 Mb/s rate (802.11b) and a Friis loss model.
++ * The transmit power is set to 7.5 dBm.
++ *
++ * It is possible to change the mobility and density of the network by
++ * directly modifying the speed and the number of nodes.  It is also
++ * possible to change the characteristics of the network by changing
++ * the transmit power (as power increases, the impact of mobility
++ * decreases and the effective density increases).
++ *
++ * By default, OLSR is used, but specifying a value of 2 for the protocol
++ * will cause AODV to be used, and specifying a value of 3 will cause
++ * DSDV to be used.
++ *
++ * By default, there are 10 source/sink data pairs sending UDP data
++ * at an application rate of 2.048 Kb/s each.    This is typically done
++ * at a rate of 4 64-byte packets per second.  Application data is
++ * started at a random time between 50 and 51 seconds and continues
++ * to the end of the simulation.
++ *
++ * The program outputs a few items:
++ * - packet receptions are notified to stdout such as:
++ *   <timestamp> <node-id> received one packet from <src-address>
++ * - each second, the data reception statistics are tabulated and output
++ *   to a comma-separated value (csv) file
++ * - some tracing and flow monitor configuration that used to work is
++ *   left commented inline in the program
++ */
++#include "manet-routing-compare.h"
++
++static inline std::string
++PrintReceivedPacket (Ptr<Socket> socket, Ptr<Packet> packet)
++{
++    SocketAddressTag tag;
++    bool found;
++    found = packet->PeekPacketTag (tag);
++    std::ostringstream oss;
++
++    oss << Simulator::Now ().GetSeconds () << " " << socket->GetNode ()->GetId ();
++
++    if (found)
++    {
++        InetSocketAddress addr = InetSocketAddress::ConvertFrom (tag.GetAddress ());
++        oss << " received one packet from " << addr.GetIpv4 ();
++    }
++    else
++    {
++        oss << " received one packet!";
++    }
++    return oss.str ();
++}
++
++void
++RoutingExperiment::ReceivePacket (Ptr<Socket> socket)
++{
++    Ptr<Packet> packet;
++    while ((packet = socket->Recv ()))
++    {
++        bytesTotal += packet->GetSize ();
++        packetsReceived += 1;
++        NS_LOG_UNCOND (PrintReceivedPacket (socket, packet));
++    }
++}
++
++void
++RoutingExperiment::CheckThroughput ()
++{
++    double kbs = (bytesTotal * 8.0) / 1000;
++    bytesTotal = 0;
++
++    std::ofstream out (m_CSVfileName.c_str (), std::ios::app);
++
++    out << (Simulator::Now ()).GetSeconds () << ","
++        << kbs << ","
++        << packetsReceived << ","
++        << m_nSinks << ","
++        << m_protocolName << ","
++        << m_txp << ""
++        << std::endl;
++
++    cout << "Total number of packets recieved successfully = " << packetsReceived << endl;
++    out.close ();
++    packetsReceived = 0;
++    Simulator::Schedule (Seconds (1.0), &RoutingExperiment::CheckThroughput, this);
++}
++
++//traced callback methods for trace source in CONFIDANT and Energy remaining
++
++void
++RoutingExperiment::TableSizeChange_LUT (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size)
++{
++    out_LUT.open(monitor_LUT.c_str (), std::ios::app);
++
++    out_LUT << node_id << ","
++            << c_time.GetMilliSeconds()/1000000 << "."
++            << c_time.GetMilliSeconds()%1000000 << ","
++            << n_size << ""
++            << std::endl;
++    out_LUT.close();
++}
++
++void
++RoutingExperiment::TableSizeChange_FirstHand (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size)
++{
++    out_First.open (repu_First.c_str (), std::ios::app);
++
++    out_First << node_id << ","
++              << c_time.GetMilliSeconds()/1000000 << "."
++              << c_time.GetMilliSeconds()%1000000 << ","
++              << n_size << ""
++              << std::endl;
++    out_First.close();
++}
++
++void
++RoutingExperiment::TableSizeChange_Rating (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size)
++{
++    out_Rating.open (repu_Rate.c_str (), std::ios::app);
++
++    out_Rating << node_id << ","
++               << c_time.GetMilliSeconds()/1000000 << "."
++               << c_time.GetMilliSeconds()%1000000 << ","
++               << n_size << ""
++               << std::endl;
++    out_Rating.close();
++}
++
++void
++RoutingExperiment::TableSizeChange_Trust (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size)
++{
++    out_Trust.open (trust.c_str (), std::ios::app);
++
++    out_Trust << node_id << ","
++              << c_time.GetMilliSeconds()/1000000 << "."
++              << c_time.GetMilliSeconds()%1000000 << ","
++              << n_size << ""
++              << std::endl;
++    out_Trust.close();
++}
++
++void
++RoutingExperiment::AddSelfishNode (const uint32_t node_id, const ns3::Time d_time, const Ipv4Address selfishnode)
++{
++
++    out_Dtection.open (detection.c_str (), std::ios::app);
++
++    out_Dtection << node_id << ","
++                 << d_time.GetMilliSeconds()/1000000 << "."
++                 << d_time.GetMilliSeconds()%1000000 << ","
++                 << getNodeId(selfishnode) << ""
++                 << std::endl;
++    out_Dtection.close();
++}
++
++void
++RoutingExperiment::RemainingPowerChange (std::string context, const double oldValue, const double newValue)
++{
++    out_energy.open (energy.c_str (), std::ios::app);
++    std::string node_id;
++    // get the context string and extract node id;
++    out_energy << node_id << ","
++               << (Simulator::Now ()).GetMilliSeconds()/1000000 << "."
++               << (Simulator::Now ()).GetMilliSeconds()%1000000 << ","
++               << newValue << ""
++               << std::endl;
++    out_energy.close();
++}
++
++Ptr<Socket>
++RoutingExperiment::SetupPacketReceive (Ipv4Address addr, Ptr<Node> node)
++{
++    TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
++    Ptr<Socket> sink = Socket::CreateSocket (node, tid);
++    InetSocketAddress local = InetSocketAddress (addr, port);
++    sink->Bind (local);
++    sink->SetRecvCallback (MakeCallback (&RoutingExperiment::ReceivePacket, this));
++
++    return sink;
++}
++
++std::string
++RoutingExperiment::CommandSetup (int argc, char **argv)
++{
++    CommandLine cmd;
++    cmd.AddValue ("CSVfileName", "The name of the CSV output file name", m_CSVfileName);
++    cmd.AddValue ("pcap", "Write PCAP traces.", pcap);
++    cmd.AddValue ("traceMobility", "Enable mobility tracing", m_traceMobility);
++
++    // AODV-CONFIDANT VARIED PARAMETERS
++    cmd.AddValue ("totalNodes", "Total Simulation Time", uofa_totalNumberOfNodes);
++    cmd.AddValue ("sinks", "Total Number of Sinks. Notes: must less than half of total number of nodes", uofa_numberOfSinks);
++    cmd.AddValue ("malicious", "Number of Malicious Nodes", uofa_numberOfMaliciousNodes);
++    cmd.AddValue ("power", "Node Transmission Power", uofa_simu_transmissionPower);
++    cmd.AddValue ("protocol", "0=AODV; 1=CONFIDANT; 2=L-CONFIDANT; 3=TradeOff", m_protocol);
++    cmd.AddValue ("pauseTime", "range: from 0 to 900 s", nodePauseTime);
++
++    /*
++    cmd.AddValue ("mvtSpeed", "Node Movement Speed", uofa_nodeMovementSpeed);
++    cmd.AddValue ("sizeX", "Simulation Area X-size", uofa_simu_areaSizeX);
++    cmd.AddValue ("sizeY", "Simulation Area Y-size", uofa_simu_areaSizeY);
++    cmd.AddValue ("totalTime", "Total Simulation Time", uofa_simu_totalSimulationTime);
++    cmd.AddValue ("startupMin", "Node Startup Min Time", uofa_simu_nodeStartupTime_Min);
++    cmd.AddValue ("startupMax", "Node Startup Max Time", uofa_simu_nodeStartupTime_Max);
++    */
++
++    cmd.Parse (argc, argv);
++
++    dictory_name = "T" + std::to_string(uofa_totalNumberOfNodes) +
++                   "M" + std::to_string(uofa_numberOfMaliciousNodes) +
++                   "P" + std::to_string(m_protocol) +
++                   "PT" + std::to_string(nodePauseTime) +
++                   "S" + std::to_string(uofa_numberOfSinks) + "/";
++
++    monitor_LUT = dictory_name + monitor_LUT;
++    repu_First = dictory_name + repu_First;
++    repu_Rate = dictory_name + repu_Rate;
++    detection = dictory_name + detection;
++    energy = dictory_name + energy;
++    trust = dictory_name + trust;
++
++    return m_CSVfileName;
++}
++
++int
++main (int argc, char *argv[])
++{
++    RoutingExperiment experiment;
++
++    //CONFIDANT: invoke command setup method
++    std::string CSVfileName = experiment.CommandSetup (argc,argv);
++    experiment.initialize_files();
++
++    //blank out the last output file and write the column headers
++    std::ofstream out (CSVfileName.c_str ());
++    out << "SimulationSecond," <<
++        "ReceiveRate," <<
++        "PacketsReceived," <<
++        "NumberOfSinks," <<
++        "RoutingProtocol," <<
++        "TransmissionPower" <<
++        std::endl;
++    out.close ();
++
++    int nSinks = experiment.uofa_numberOfSinks;
++    double txp = experiment.uofa_simu_transmissionPower;
++
++    experiment.Run (nSinks, txp, CSVfileName);
++}
++
++void
++RoutingExperiment::setAllContainer(NodeContainer* nc, NetDeviceContainer* ndc, Ipv4InterfaceContainer* ipic)
++{
++    this.nc = nc;
++    this.ndc = ndc;
++    this.ipic = ipic;
++}
++
++uint32_t
++RoutingExperiment::getNodeId(Ipv4Address node_ip)
++{
++    for(int i = 0; i < ipic->GetN(); i++)
++    {
++        if(ipic->GetAddress(i) == node_ip)
++        {
++            Ptr<NetDevice> n_p = ndc->Get(i);
++            return (n_p->GetNode())->GetId();
++        }
++    }
++}
++
++void
++RoutingExperiment::initialize_files()
++{
++    out_LUT.open(monitor_LUT.c_str ());
++    out_LUT << "NodeId," <<
++            "Time," <<
++            "Size" <<
++            std::endl;
++    out_LUT.close ();
++
++    out_First.open(repu_First.c_str ());
++    out_First << "NodeId," <<
++              "Time," <<
++              "Size" <<
++              std::endl;
++    out_First.close ();
++
++    out_Rating.open(repu_Rate.c_str ());
++    out_Rating << "NodeId," <<
++               "Time," <<
++               "Size" <<
++               std::endl;
++    out_Rating.close ();
++
++    out_Dtection.open(detection.c_str ());
++    out_Dtection << "NodeId," <<
++                 "DetectionTime," <<
++                 "SelfishNodeId" <<
++                 std::endl;
++    out_Dtection.close ();
++
++    out_energy.open (energy.c_str ());
++    out_energy << "NodeId," <<
++               "Time," <<
++               "RemainingPower" <<
++               std::endl;
++    out_energy.close ();
++
++    out_Trust.open (trust.c_str ());
++    out_Trust << "NodeId," <<
++              "Time," <<
++              "Size" <<
++              std::endl;
++    out_Trust.close ();
++}
++
++void
++RoutingExperiment::Run (int nSinks, double txp, std::string CSVfileName)
++{
++    Packet::EnablePrinting ();
++    m_nSinks = nSinks;
++    m_txp = txp;
++    m_CSVfileName = CSVfileName;
++
++    int nWifis = uofa_totalNumberOfNodes;
++
++    double TotalTime = uofa_simu_totalSimulationTime;
++    std::string rate ("2048bps");
++    std::string phyMode ("DsssRate11Mbps");
++    std::string tr_name ("manet-routing-compare");
++    //CONFIDANT: CHANGE TO A RANGE
++    int nodeSpeedMax = uofa_nodeMovementSpeedMax; //in m/s
++    int nodeSpeedMin = uofa_nodeMovementSpeedMin;
++    int nodePause = nodePauseTime; //in s
++    m_protocolName = "protocol";
++
++    Config::SetDefault  ("ns3::OnOffApplication::PacketSize",StringValue ("64"));
++    Config::SetDefault ("ns3::OnOffApplication::DataRate",  StringValue (rate));
++
++    //Set Non-unicastMode rate to unicast mode
++    Config::SetDefault ("ns3::WifiRemoteStationManager::NonUnicastMode",StringValue (phyMode));
++
++//------------------------------------------------------------------------------------------------------------------------------------
++
++    // Create separate containers for normal and blackhole
++    NodeContainer adhocNodes;
++    NodeContainer normalNodesContainer;
++    NodeContainer maliciousNodesContainer;
++
++    //ADD MALICIOUS NODES SELECTIVELY BASED ON GENERATED IDs
++    std::vector<int> mal;//(uofa_maliciousNodeIDs, uofa_maliciousNodeIDs + sizeof(uofa_maliciousNodeIDs) / sizeof(int));
++    std::vector<int>::iterator mal_it;
++
++    for(int i=0; i<uofa_numberOfMaliciousNodes; i++)
++    {
++        int r;
++        do
++        {
++            r = rand() % nWifis;
++            mal_it = find(mal.begin(), mal.begin()+i, r);
++        }
++        while(mal_it != mal.end());
++        mal.push_back(r);
++    }
++
++    cout << "Malicious Node IDs:" << endl;
++    for(unsigned int i=0; i<mal.size(); i++)
++    {
++        cout << mal[i] << endl;
++    }
++
++
++    // Add normal and blackhole nodes to respective containers
++    adhocNodes.Create (nWifis);
++
++    for(int i=0; i<nWifis; i++)
++    {
++        mal_it = find (mal.begin(), mal.end(), i);
++        if(mal_it != mal.end())
++        {
++            maliciousNodesContainer.Add(adhocNodes.Get(i));
++        }
++        else
++        {
++            normalNodesContainer.Add(adhocNodes.Get(i));
++        }
++    }
++
++///------------------------------------------------------------------------------------------------------------------------------------
++
++    // setting up wifi phy and channel using helpers
++    WifiHelper wifi;
++    wifi.SetStandard (WIFI_PHY_STANDARD_80211b);
++
++    YansWifiPhyHelper wifiPhy =  YansWifiPhyHelper::Default ();
++    YansWifiChannelHelper wifiChannel;
++    wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
++    wifiChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel");
++    wifiPhy.SetChannel (wifiChannel.Create ());
++
++    // Add a non-QoS upper mac, and disable rate control
++    NqosWifiMacHelper wifiMac = NqosWifiMacHelper::Default ();
++    wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager",
++                                  "DataMode",StringValue (phyMode),
++                                  "ControlMode",StringValue (phyMode));
++
++    wifiPhy.Set ("TxPowerStart",DoubleValue (txp));
++    wifiPhy.Set ("TxPowerEnd", DoubleValue (txp));
++
++    wifiMac.SetType ("ns3::AdhocWifiMac");
++    NetDeviceContainer adhocDevices = wifi.Install (wifiPhy, wifiMac, adhocNodes);
++
++
++///--------------------------------------------------------------------------------------------------------------------------------------
++
++    MobilityHelper mobilityAdhoc;
++    int64_t streamIndex = 0; // used to get consistent mobility across scenarios
++
++    ObjectFactory pos;
++    pos.SetTypeId ("ns3::RandomRectanglePositionAllocator");
++    pos.Set ("X", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=" + uofa_simu_areaSizeX + "]"));     // CHANGE POSITIONS HERE
++    pos.Set ("Y", StringValue ("ns3::UniformRandomVariable[Min=0.0|Max=" + uofa_simu_areaSizeY + "]"));     // CHANGE POSITIONS HERE
++
++    Ptr<PositionAllocator> taPositionAlloc = pos.Create ()->GetObject<PositionAllocator> ();
++    streamIndex += taPositionAlloc->AssignStreams (streamIndex);
++
++    std::stringstream ssSpeed;
++    ssSpeed << "ns3::UniformRandomVariable[Min="<< nodeSpeedMin <<"|Max=" << nodeSpeedMax << "]";
++
++    std::stringstream ssPause;
++    ssPause << "ns3::ConstantRandomVariable[Constant=" << nodePause << "]";
++
++    mobilityAdhoc.SetMobilityModel ("ns3::RandomWaypointMobilityModel",
++                                    "Speed", StringValue (ssSpeed.str ()),
++                                    "Pause", StringValue (ssPause.str ()),
++                                    "PositionAllocator", PointerValue (taPositionAlloc));
++    mobilityAdhoc.SetPositionAllocator (taPositionAlloc);
++    mobilityAdhoc.Install (adhocNodes);
++    streamIndex += mobilityAdhoc.AssignStreams (adhocNodes, streamIndex);
++
++
++    /** Energy Model **/
++    /***************************************************************************/
++    /* energy source */
++    BasicEnergySourceHelper basicSourceHelper;
++    // configure energy source
++    basicSourceHelper.Set ("BasicEnergySourceInitialEnergyJ", DoubleValue (2000));
++    // install source
++    EnergySourceContainer sources = basicSourceHelper.Install (adhocNodes);
++    /* device energy model */
++    WifiRadioEnergyModelHelper radioEnergyHelper;
++    // configure radio energy model
++    //radioEnergyHelper.Set ("TxCurrentA", DoubleValue (0.0174));
++    // install device model
++    DeviceEnergyModelContainer deviceModels = radioEnergyHelper.Install (adhocDevices, sources);
++    /***************************************************************************/
++
++
++///-------------------------------------------------------------------------------------------------------------------------------------
++
++    AodvHelper aodv;
++    AodvHelper malicious_aodv;
++
++    Ipv4ListRoutingHelper list;
++    InternetStackHelper internet;
++
++    /*
++      codes to install internet stack and AODV on both regualr and selfish nodes
++    */
++    switch (m_protocol)
++    {
++    case 0:
++        enableC = false;
++        enableL = false;
++        m_protocolName = "AODV";
++        break;
++    case 1:
++        enableC = true;
++        enableL = false;
++        m_protocolName = "AODV WITH CONFIDANT";
++        break;
++    case 2:
++        enableC = true;
++        enableL = true;
++        m_protocolName = "AODV WITH L-CONFIDANT";
++        break;
++    case 3:
++        enableC = true;
++        enableL = true;
++        enableT = true;
++        m_protocolName = "AODV WITH L-CONFIDANT and TradeOff";
++    default:
++        NS_FATAL_ERROR ("No such protocol:" << m_protocol);
++    }
++
++    internet.SetRoutingHelper (aodv);
++    internet.Install (normalNodesContainer);
++    NodeContainer::Iterator i;
++    for (i = normalNodesContainer.Begin (); i != normalNodesContainer.End (); ++i)
++    {
++        Ptr<ns3::aodv::RoutingProtocol> p_aodv = (*i)->GetObject<Ipv4> ()->GetObject<ns3::aodv::RoutingProtocol> ();
++        p_aodv->setC(enableC);
++        p_aodv->setL(enableL);
++        p_aodv->setT(enableT);
++        Ptr<NetDevice> p_device = (*i)->GetDevice(0);
++        p_device->SetPromiscReceiveCallback(MakeCallback(&ns3::confidant::Monitor::handlePassivePack, p_aodv->getMonitor());
++    }
++
++    malicious_raodv.Set("IsMalicious",BooleanValue(true));
++    internet.SetRoutingHelper (malicious_aodv);
++    internet.Install (maliciousNodesContainer);
++    NodeContainer::Iterator i;
++    for (i = maliciousNodesContainer.Begin (); i != maliciousNodesContainer.End (); ++i)
++    {
++        Ptr<ns3::aodv::RoutingProtocol> p_aodv = (*i)->GetObject<Ipv4> ()->GetObject<ns3::aodv::RoutingProtocol> ();
++        p_aodv->setC(enableC);
++        p_aodv->setL(enableL);
++        p_aodv->setT(enableT);
++        Ptr<NetDevice> p_device = (*i)->GetDevice(0);
++        p_device->SetPromiscReceiveCallback(MakeCallback(&ns3::confidant::Monitor::handlePassivePack, p_aodv->getMonitor());
++    }
++
++///--------------------------------------------------------------------------------------------------------------------------------------
++
++    NS_LOG_INFO ("assigning ip address");
++
++    Ipv4AddressHelper addressAdhoc;
++    addressAdhoc.SetBase ("10.1.1.0", "255.255.255.0");
++    Ipv4InterfaceContainer adhocInterfaces;
++    adhocInterfaces = addressAdhoc.Assign (adhocDevices);
++
++///-------------------------------------------------------------------------------------------------------------------------------------
++
++    OnOffHelper onoff1 ("ns3::UdpSocketFactory",Address ());
++    onoff1.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1.0]"));
++    onoff1.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0.0]"));
++
++    for (int i = 0; i < nSinks; i++)
++    {
++        Ptr<Socket> sink = SetupPacketReceive (adhocInterfaces.GetAddress (i), adhocNodes.Get (i));
++
++        AddressValue remoteAddress (InetSocketAddress (adhocInterfaces.GetAddress (i), port));
++        onoff1.SetAttribute ("Remote", remoteAddress);
++
++        Ptr<UniformRandomVariable> var = CreateObject<UniformRandomVariable> ();
++        ApplicationContainer temp = onoff1.Install (adhocNodes.Get (i + nSinks));
++        temp.Start (Seconds (var->GetValue (uofa_simu_nodeStartupTime_Min,uofa_simu_nodeStartupTime_Max)));
++        temp.Stop (Seconds (TotalTime));
++    }
++
++//--------------------------------------------CONFIG TRACED OUTPUT------------------------------------------------
++
++    std::stringstream ss;
++    ss << nWifis;
++    std::string nodes = ss.str ();
++
++    std::stringstream ss2;
++    ss2 << uofa_numberOfMaliciousNodes;
++    std::string nSelfish = ss2.str ();
++
++    std::stringstream ss3;
++    ss3 << nodePause;
++    std::string sNodePause = ss3.str ();
++
++    NS_LOG_INFO ("Configure Tracing.");
++    tr_name = tr_name + "_" + m_protocolName +"_" + nodes + "nodes_" + sNodePause + "pause_" + nSelfish + "selfish";
++
++    if (pcap)
++        wifiPhy.EnablePcapAll (tr_name);
++
++    AsciiTraceHelper ascii;
++    MobilityHelper::EnableAsciiAll (ascii.CreateFileStream (tr_name + ".mob"));
++
++    // Ptr<FlowMonitor> flowmon;
++    // FlowMonitorHelper flowmonHelper;
++    // flowmon = flowmonHelper.InstallAll ();
++
++    //AsciiTraceHelper ascii;
++    //Ptr<OutputStreamWrapper> osw = ascii.CreateFileStream ( (tr_name + ".tr").c_str());
++    //wifiPhy.EnableAsciiAll (osw);
++
++    NS_LOG_INFO ("Configure Tracing of Memory Overhead.");
++
++    Config::Connect("/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::Monitor/LUTSizeChange",
++                    MakeCallback(&RoutingExperiment::TableSizeChange_LU, this));
++
++    Config::Connect("/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::ReputationSystem/FTableSizeChange",
++                    MakeCallback(&RoutingExperiment::TableSizeChange_FirstHand, this));
++
++    Config::Connect("/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::ReputationSystem/RTableSizeChange",
++                    MakeCallback(&RoutingExperiment::TableSizeChange_Rating, this));
++
++    Config::Connect("/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::PathManager/DetectedSelfishNode",
++                    MakeCallback(&RoutingExperiment::AddSelfishNode, this));
++
++    Config::Connect("/NodeList/*/$ns3::aodv::RoutingProtocol/$ns3::confidant::TrustManager/TrustTalbleSizeChange",
++                    MakeCallback(&RoutingExperiment::TableSizeChange_Trust, this));
++
++    NS_LOG_INFO ("Configure Tracing of Remaining Energy of source.");
++
++    for(EnergySourceContainer::Iterator i = source.Begin(); i!= source.End(); i++)
++    {
++        Ptr<BasicEnergySource> basicSourcePtr = DynamicCast<BasicEnergySource> (*i);
++        uint32_t id = ((*i)->GetNode())->GetId();
++        basicSourcePtr->TraceConnect ("RemainingEnergy", std::to_string(id), MakeCallback (&RoutingExperiment::RemainingPowerChange, this));
++    }
++
++
++    NS_LOG_INFO ("Run Simulation.");
++
++    CheckThroughput ();
++
++    Simulator::Stop (Seconds (TotalTime));
++
++    AnimationInterface anim ("manet-routing-compare.xml");  // FOR GENERATING NETANIM XML FILE
++
++    Simulator::Run ();
++
++    // flowmon->SerializeToXmlFile ((tr_name+"_flowmon.xml").c_str(), true, true);
++
++    Simulator::Destroy ();
++}
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.h ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.h
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.h	1970-01-01 09:30:00.000000000 +0930
++++ ns-allinone-3.22/ns-3.22/examples/routing/manet-routing-compare.h	2016-01-04 18:34:22.325092980 +1030
+@@ -0,0 +1,161 @@
++#include <fstream>
++#include <iostream>
++#include <vector>
++#include "ns3/core-module.h"
++#include "ns3/network-module.h"
++#include "ns3/internet-module.h"
++#include "ns3/mobility-module.h"
++#include "ns3/wifi-module.h"
++#include "ns3/aodv-module.h"// add confidant components into wscript file ?
++#include "ns3/olsr-module.h"
++#include "ns3/dsdv-module.h"
++#include "ns3/dsr-module.h"
++#include "ns3/applications-module.h"
++#include "ns3/flow-monitor-module.h"
++#include "ns3/energy-module.h"
++#include <string>
++#include "ns3/netanim-module.h"
++#include <sstream>
++
++using namespace ns3;
++
++NS_LOG_COMPONENT_DEFINE ("manet-routing-compare");
++bool pcap(true);
++
++template <typename T>
++std::string NumberToString ( T Number )
++{
++	std::stringstream ss;
++	ss << Number;
++	return ss.str();
++}
++
++
++class RoutingExperiment
++{
++
++public:
++    RoutingExperiment ();
++    void Run (int nSinks, double txp, std::string CSVfileName);
++
++    //static void SetMACParam (ns3::NetDeviceContainer & devices,
++    //                                 int slotDistance);
++
++    std::string CommandSetup (int argc, char **argv);
++
++    //traced callback methods for trace source in CONFIDANT and Energy remaining
++    void TableSizeChange_LUT (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size);
++    void TableSizeChange_FirstHand (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size);
++    void TableSizeChange_Rating (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size);
++    void AddSelfishNode (const uint32_t node_id, const ns3::Time d_time, const Ipv4Address selfishnode, bool);
++    void RemainingPowerChange (std::string context, const double oldValue, const double newValue);
++    void TableSizeChange_Trust (const uint32_t node_id, const ns3::Time c_time, const uint32_t n_size);
++    void initialize_files();
++
++    //AODV-CONFIDANT, SET FOR PASS PARAMETERS FOR METHOD Run(...)
++    int     uofa_numberOfSinks;               // Number of different destinations for all packets sent
++    double  uofa_simu_transmissionPower;      // dBm
++
++private:
++    Ptr<Socket> SetupPacketReceive (Ipv4Address addr, Ptr<Node> node);
++    void ReceivePacket (Ptr<Socket> socket);
++    void CheckThroughput ();
++
++    uint32_t port;
++    uint32_t bytesTotal;
++    uint32_t packetsReceived;
++
++    std::string m_CSVfileName;
++    int m_nSinks; // Number of different destinations for all packets sent
++    std::string m_protocolName;
++    double m_txp; //dBM
++    bool m_traceMobility;
++     uint32_t m_protocol; // protocol types
++
++
++    //AODV-CONFDIANT
++    int     uofa_totalNumberOfNodes;           // 30, 50, 100
++    int     uofa_numberOfMaliciousNodes;       // 10%, 20% and 30%
++
++    int     uofa_nodeMovementSpeedMax;         // 20 m/s
++    int     uofa_nodeMovementSpeedMin;         // 5 m/s
++
++    std::string  uofa_simu_areaSizeX;              // Width of Simulation Area: 1000 m
++    std::string  uofa_simu_areaSizeY;              // Height of Simulation Area: 1000 m
++
++    double  uofa_simu_totalSimulationTime;    // seconds: 1200 s
++    double  uofa_simu_nodeStartupTime_Min;    // determines random time before nodes begin sending packets
++    double  uofa_simu_nodeStartupTime_Max;    // determines random time before nodes begin sending packets
++    int  nodePauseTime;                        // nodes pause timer [0, 900]
++
++    //AODV-CONFIDANT
++    bool enableC;
++    bool enableL;
++    bool enableT;
++
++    //Set filestreams for record traced output data
++    std::string monitor_LUT;
++    std::string repu_First;
++    std::string repu_Rate;
++    std::string detection;
++    std::string energy;
++    std::string trust;
++    std::string dictory_name;
++
++    std::ofstream out_LUT;
++    std::ofstream out_First;
++    std::ofstream out_Rating;
++    std::ofstream out_Dtection;
++    std::ofstream out_energy;
++    std::ofstream out_Trust;
++
++    NodeContainer* nc;
++    NetDeviceContainer* ndc;
++    Ipv4InterfaceContainer* ipic;
++    void setAllContainer(NodeContainer*, NetDeviceContainer*, Ipv4InterfaceContainer*);
++    uint32_t getNodeId(Ipv4Address);
++
++};
++
++RoutingExperiment::RoutingExperiment ()
++    :
++    uofa_numberOfSinks (10),
++    uofa_simu_transmissionPower (7.5),
++
++    port (9),
++    bytesTotal (0),
++    packetsReceived (0),
++    m_CSVfileName ("manet-routing.output.csv"),
++    m_traceMobility (false),
++
++    //CONFIDANT
++    m_protocol (0), // Default value: use AODV only without any version of CONFIDANT
++
++    // AODV default values
++    uofa_totalNumberOfNodes (30),
++    uofa_numberOfMaliciousNodes (3),
++    uofa_nodeMovementSpeedMax (20),
++    uofa_nodeMovementSpeedMin (5),
++
++    uofa_simu_areaSizeX ("1000.0"),
++    uofa_simu_areaSizeY ("1000.0"),
++
++    uofa_simu_totalSimulationTime (1200.0),
++    uofa_simu_nodeStartupTime_Min (50.0),
++    uofa_simu_nodeStartupTime_Max (51.0),
++    nodePauseTime (0),
++    enableC (false),
++    enableL (false),
++    enableT (false)
++{
++    // uofa_maliciousNodeIDs[] = {};
++     monitor_LUT = "LUT_SIZE.csv";
++   repu_First = "Firsthand_SIZE.csv";
++    repu_Rate = "Rating_SIZE.csv";
++    detection = "SelfishNode_DetectionTime.csv";
++    energy = "Remaining_Power.csv";
++     trust = "Trust_SIZE.csv";
++}
++
++
++
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/routing/wscript ns-allinone-3.22/ns-3.22/examples/routing/wscript
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/routing/wscript	2016-01-07 15:07:12.756094453 +1030
++++ ns-allinone-3.22/ns-3.22/examples/routing/wscript	2015-11-25 16:11:13.929550164 +1030
+@@ -34,7 +34,7 @@
+     obj.source = 'simple-routing-ping6.cc'
+ 
+     obj = bld.create_ns3_program('manet-routing-compare',
+-                                 ['wifi', 'dsr', 'dsdv', 'aodv', 'olsr', 'internet', 'applications'])
++                                 ['netanim','wifi', 'dsr', 'dsdv', 'aodv', 'olsr', 'internet', 'applications','visualizer'])
+     obj.source = 'manet-routing-compare.cc'
+ 
+     obj = bld.create_ns3_program('ripng-simple-network',
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/routing/wscript~ ns-allinone-3.22/ns-3.22/examples/routing/wscript~
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/routing/wscript~	1970-01-01 09:30:00.000000000 +0930
++++ ns-allinone-3.22/ns-3.22/examples/routing/wscript~	2015-11-21 15:43:15.975716995 +1030
+@@ -0,0 +1,44 @@
++## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
++
++def build(bld):
++    obj = bld.create_ns3_program('dynamic-global-routing',
++                                 ['point-to-point', 'csma', 'internet', 'applications'])
++    obj.source = 'dynamic-global-routing.cc'
++
++    obj = bld.create_ns3_program('static-routing-slash32',
++                                 ['point-to-point', 'csma', 'internet', 'applications'])
++    obj.source = 'static-routing-slash32.cc'
++
++    obj = bld.create_ns3_program('global-routing-slash32',
++                                 ['point-to-point', 'csma', 'internet', 'applications'])
++    obj.source = 'global-routing-slash32.cc'
++
++    obj = bld.create_ns3_program('global-injection-slash32',
++                                 ['point-to-point', 'csma', 'internet', 'applications'])
++    obj.source = 'global-injection-slash32.cc'
++
++    obj = bld.create_ns3_program('simple-global-routing',
++                                 ['point-to-point', 'internet', 'applications', 'flow-monitor'])
++    obj.source = 'simple-global-routing.cc'
++
++    obj = bld.create_ns3_program('simple-alternate-routing',
++                                 ['point-to-point', 'internet', 'applications'])
++    obj.source = 'simple-alternate-routing.cc'
++
++    obj = bld.create_ns3_program('mixed-global-routing',
++                                 ['point-to-point', 'internet', 'csma', 'applications'])
++    obj.source = 'mixed-global-routing.cc'
++
++    obj = bld.create_ns3_program('simple-routing-ping6',
++                                 ['csma', 'internet', 'applications'])
++    obj.source = 'simple-routing-ping6.cc'
++
++    obj = bld.create_ns3_program('manet-routing-compare',
++                                 ['netanim','wifi', 'dsr', 'dsdv', 'aodv', 'olsr', 'internet', 'applications'])
++    obj.source = 'manet-routing-compare.cc'
++
++    obj = bld.create_ns3_program('ripng-simple-network',
++                                 ['csma', 'internet', 'applications'])
++    obj.source = 'ripng-simple-network.cc'
++
++    bld.register_ns3_script('simple-routing-ping6.py', ['csma', 'internet', 'applications'])
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/tutorial/first.cc ns-allinone-3.22/ns-3.22/examples/tutorial/first.cc
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/tutorial/first.cc	2016-01-07 15:07:12.756094453 +1030
++++ ns-allinone-3.22/ns-3.22/examples/tutorial/first.cc	2015-11-26 21:01:51.646593199 +1030
+@@ -64,7 +64,7 @@
+   clientApps.Start (Seconds (2.0));
+   clientApps.Stop (Seconds (10.0));
+ 
+-  Simulator::Run ();
++  Simulator::Run();
+   Simulator::Destroy ();
+   return 0;
+ }
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/tutorial/.first.cc.swp ns-allinone-3.22/ns-3.22/examples/tutorial/.first.cc.swp
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/tutorial/.first.cc.swp	1970-01-01 09:30:00.000000000 +0930
++++ ns-allinone-3.22/ns-3.22/examples/tutorial/.first.cc.swp	2015-05-10 13:32:44.377929689 +0930
+@@ -0,0 +1,10 @@
++b0VIM 7.4      Î ÔTW6 +  josh                                    josh-ThinkPad-Edge-E540                 ~josh/workspace/ns-allinone-3.22/ns-3.22/examples/tutorial/first.cc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          utf-8U3210    #"! U                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 tp           F                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             ad  Ë  ÿ     F       ¾  »  s  .     ý  º  x  7      ¿  €  3  /  .    ñ  Ð  ©  „  ƒ  n  m  =  <  8      ö  ³  p  o  X  D  C     Ù
++  –
++  •
++  w
++  M
++  L
++  /
++  
++  
++  ø	  Ç	  Æ	  †	  …	  _	  ^	  	  ò  Î  Í  Œ  O    Ì  Ë  ƒ  _  ;  :  %       ÿ  ý                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            }   return 0;   Simulator::Destroy ();   Simulator::Run ();    clientApps.Stop (Seconds (10.0));   clientApps.Start (Seconds (2.0));   ApplicationContainer clientApps = echoClient.Install (nodes.Get (0));    echoClient.SetAttribute ("PacketSize", UintegerValue (1024));   echoClient.SetAttribute ("Interval", TimeValue (Seconds (1.0)));   echoClient.SetAttribute ("MaxPackets", UintegerValue (1));   UdpEchoClientHelper echoClient (interfaces.GetAddress (1), 9);    serverApps.Stop (Seconds (10.0));   serverApps.Start (Seconds (1.0));   ApplicationContainer serverApps = echoServer.Install (nodes.Get (1));    UdpEchoServerHelper echoServer (9);    Ipv4InterfaceContainer interfaces = address.Assign (devices);    address.SetBase ("10.1.1.0", "255.255.255.0");   Ipv4AddressHelper address;    stack.Install (nodes);   InternetStackHelper stack;    devices = pointToPoint.Install (nodes);   NetDeviceContainer devices;    pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));   PointToPointHelper pointToPoint;    nodes.Create (2);   NodeContainer nodes;    LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);   LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);   Time::SetResolution (Time::NS); { main (int argc, char *argv[]) int  NS_LOG_COMPONENT_DEFINE ("FirstScriptExample");  using namespace ns3;  #include "ns3/applications-module.h" #include "ns3/point-to-point-module.h" #include "ns3/internet-module.h" #include "ns3/network-module.h" #include "ns3/core-module.h"   */  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA  * along with this program; if not, write to the Free Software  * You should have received a copy of the GNU General Public License  *  * GNU General Public License for more details.  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the  * but WITHOUT ANY WARRANTY; without even the implied warranty of  * This program is distributed in the hope that it will be useful,  *  * published by the Free Software Foundation;  * it under the terms of the GNU General Public License version 2 as  * This program is free software; you can redistribute it and/or modify /* /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */ 
+\ No newline at end of file
+diff -Naur ns-original/ns-allinone-3.22/ns-3.22/examples/tutorial/fourth.cc ns-allinone-3.22/ns-3.22/examples/tutorial/fourth.cc
+--- ns-original/ns-allinone-3.22/ns-3.22/examples/tutorial/fourth.cc	2016-01-07 15:07:12.756094453 +1030
++++ ns-allinone-3.22/ns-3.22/examples/tutorial/fourth.cc	2015-11-27 21:28:53.696035237 +1030
+@@ -44,7 +44,7 @@
+ };
+ 
+ void
+-IntTrace (int32_t oldValue, int32_t newValue)
++IntTrace (std::string context, int32_t oldValue, int32_t newValue)
+ {
+   std::cout << "Traced " << oldValue << " to " << newValue << std::endl;
+ }

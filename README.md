@@ -12,7 +12,15 @@ E-mail: tgdeverbest@gmail.com
 HOW-TO-RUN
 ```
 1. 'git clone https://github.cs.adelaide.edu.au/a1650373/CONFIDANT.git' to directory 'X' or use patch file.
+      
+OR
+ 
+    Download ns-3.22 srouce code, 
+    
+    run script apply_patches.sh to patch source tree.
+ 
 2.  Eneter directory /X/CONFIDANT/untils/, run 'x_module_build.sh' to clean and rebuild source.
+
 3.  Run the simulation via the script 'run_simulation.sh'. This script will also generate directories for traced files.
 
 The actual command to run simulation in script 'run_simulation.sh' as follows:
